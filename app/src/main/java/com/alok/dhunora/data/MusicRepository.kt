@@ -4,8 +4,11 @@ import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.InfoItem
+import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
@@ -18,7 +21,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 object MusicRepository {
     private val typedSearchCache = ConcurrentHashMap<String, List<MusicSearchItem>>()
-    private val audioUrlCache = ConcurrentHashMap<String, String>()
+    private data class CachedAudio(val url: String, val cachedAtMs: Long)
+
+    private val audioUrlCache = ConcurrentHashMap<String, CachedAudio>()
+    private const val AUDIO_CACHE_TTL_MS = 20L * 60L * 1000L
 
     suspend fun searchSongs(query: String): List<Song> =
         search(query, SearchKind.SONG).mapNotNull { it.toSongOrNull() }
@@ -146,16 +152,58 @@ object MusicRepository {
         }
 
     suspend fun resolveAudioUrl(song: Song): String = withContext(Dispatchers.IO) {
-        audioUrlCache[song.sourceUrl]?.let { return@withContext it }
+        val now = System.currentTimeMillis()
+        audioUrlCache[song.sourceUrl]
+            ?.takeIf { now - it.cachedAtMs < AUDIO_CACHE_TTL_MS }
+            ?.let { return@withContext it.url }
 
         val info = StreamInfo.getInfo(ServiceList.YouTube, song.sourceUrl)
-        val audio = info.audioStreams.asSequence()
+        val streams = info.audioStreams
+            .asSequence()
             .filter { it.isUrl && it.content.isNotBlank() }
-            .maxByOrNull { it.averageBitrate }
+            .toList()
+
+        if (streams.isEmpty()) {
+            error("No playable audio stream found")
+        }
+
+        // Prefer Android-friendly M4A/AAC around normal music bitrates.
+        // It normally starts faster and is less error-prone than picking the
+        // highest-bitrate stream blindly.
+        val preferred = streams
+            .filter { it.format == MediaFormat.M4A }
+            .sortedByDescending { it.averageBitrate }
+            .firstOrNull { it.averageBitrate in 96..192 }
+            ?: streams
+                .filter { it.format == MediaFormat.M4A }
+                .maxByOrNull { it.averageBitrate }
+            ?: streams
+                .filter { it.averageBitrate in 64..192 }
+                .maxByOrNull { it.averageBitrate }
+            ?: streams.maxByOrNull { it.averageBitrate }
             ?: error("No playable audio stream found")
 
-        audioUrlCache[song.sourceUrl] = audio.content
-        audio.content
+        audioUrlCache[song.sourceUrl] = CachedAudio(
+            url = preferred.content,
+            cachedAtMs = now
+        )
+        preferred.content
+    }
+
+    suspend fun prefetchAudioUrls(songs: List<Song>) = coroutineScope {
+        songs
+            .distinctBy { it.sourceUrl }
+            .take(2)
+            .map { song ->
+                async(Dispatchers.IO) {
+                    runCatching { resolveAudioUrl(song) }
+                }
+            }
+            .forEach { it.await() }
+    }
+
+    fun invalidateAudioUrl(song: Song) {
+        audioUrlCache.remove(song.sourceUrl)
     }
 
     fun artworkFor(song: Song): String? =
