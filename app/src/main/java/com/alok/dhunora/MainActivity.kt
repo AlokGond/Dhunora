@@ -2929,10 +2929,10 @@ private fun PlayerAndNavigation(
     ) {
         if (currentSong != null) {
             Surface(
+                onClick = onOpenPlayer,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(70.dp)
-                    .clickable(onClick = onOpenPlayer),
+                    .height(70.dp),
                 shape = RoundedCornerShape(18.dp),
                 color =
                     if (glassEnabled)
@@ -2943,7 +2943,8 @@ private fun PlayerAndNavigation(
                     if (glassEnabled)
                         BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                     else null,
-                tonalElevation = if (glassEnabled) 0.dp else 8.dp
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
             ) {
                 Column {
                     Row(
@@ -3052,9 +3053,8 @@ private fun PlayerAndNavigation(
             Spacer(Modifier.width(10.dp))
 
             Surface(
-                modifier = Modifier
-                    .size(58.dp)
-                    .clickable { onSelect(MainTab.SEARCH) },
+                onClick = { onSelect(MainTab.SEARCH) },
+                modifier = Modifier.size(58.dp),
                 shape = CircleShape,
                 color =
                     if (selectedTab == MainTab.SEARCH)
@@ -3064,7 +3064,8 @@ private fun PlayerAndNavigation(
                     if (glassEnabled && selectedTab != MainTab.SEARCH)
                         BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
                     else null,
-                tonalElevation = if (glassEnabled) 0.dp else 6.dp
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -3090,9 +3091,18 @@ private fun BottomTab(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.width(84.dp).fillMaxHeight().clickable(onClick = onClick),
+        onClick = onClick,
+        modifier = Modifier
+            .width(84.dp)
+            .fillMaxHeight(),
         shape = RoundedCornerShape(28.dp),
-        color = if (selected) MaterialTheme.colorScheme.background.copy(alpha = 0.72f) else Color.Transparent
+        color =
+            if (selected)
+                MaterialTheme.colorScheme.background.copy(alpha = 0.72f)
+            else
+                Color.Transparent,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
