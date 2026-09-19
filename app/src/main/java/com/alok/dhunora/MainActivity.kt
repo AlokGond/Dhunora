@@ -138,6 +138,7 @@ import com.alok.dhunora.account.AccountSession
 import com.alok.dhunora.account.LoginActivity
 import com.alok.dhunora.data.DownloadRecord
 import com.alok.dhunora.data.DownloadedSongStore
+import com.alok.dhunora.data.ListeningProfileStore
 import com.alok.dhunora.data.LocalPlaylistStore
 import com.alok.dhunora.data.MusicRepository
 import com.alok.dhunora.model.MusicSearchItem
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var controllerFuture: ListenableFuture<MediaController>
     private var sleepTimerJob: Job? = null
     private var searchJob: Job? = null
+    private var recommendationJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -192,6 +194,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         searchJob?.cancel()
+        recommendationJob?.cancel()
         sleepTimerJob?.cancel()
         if (::controllerFuture.isInitialized) {
             MediaController.releaseFuture(controllerFuture)
@@ -291,7 +294,7 @@ class MainActivity : ComponentActivity() {
         var playerExpanded by rememberSaveable { mutableStateOf(false) }
         var playerPane by rememberSaveable { mutableStateOf(PlayerPane.UP_NEXT) }
         var favorites by remember { mutableStateOf(loadFavorites()) }
-        var recentSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var recentSongs by remember { mutableStateOf(ListeningProfileStore.recent(this@MainActivity)) }
         var playbackQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
         var selectedMood by rememberSaveable { mutableStateOf("All") }
         var showSettings by remember { mutableStateOf(false) }
@@ -398,7 +401,8 @@ class MainActivity : ComponentActivity() {
                         listOf(song) +
                             recentSongs
                                 .filterNot { it.sourceUrl == song.sourceUrl }
-                                .take(19)
+                                .take(49)
+                    ListeningProfileStore.recordPlay(this@MainActivity, song)
 
                     val metadata =
                         MediaMetadata.Builder()
@@ -452,21 +456,79 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        fun startRecommendationRadio(song: Song) {
+            recommendationJob?.cancel()
+
+            val seedQueue = listOf(song)
+            playbackQueue = seedQueue
+            playSong(song, seedQueue)
+
+            recommendationJob =
+                lifecycleScope.launch {
+                    val related =
+                        runCatching { MusicRepository.relatedSongs(song) }
+                            .getOrDefault(emptyList())
+
+                    if (currentSong?.sourceUrl == song.sourceUrl) {
+                        playbackQueue =
+                            (listOf(song) + related)
+                                .distinctBy { it.sourceUrl }
+
+                        prefetchFollowing(song, playbackQueue)
+                    }
+                }
+        }
+
         fun playNext() {
             val queue = playbackQueue.ifEmpty { fallbackQueue() }
             if (queue.isEmpty()) return
 
+            val active = currentSong ?: queue.first()
             val currentIndex =
-                currentSong?.let { active ->
-                    queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
-                } ?: -1
+                queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
+                    .takeIf { it >= 0 } ?: 0
 
-            val nextIndex =
-                if (currentIndex < 0) 0
-                else (currentIndex + 1) % queue.size
+            if (queue.size <= 1 || currentIndex >= queue.lastIndex) {
+                buffering = true
+                recommendationJob?.cancel()
+                recommendationJob =
+                    lifecycleScope.launch {
+                        val related =
+                            runCatching { MusicRepository.relatedSongs(active) }
+                                .getOrDefault(emptyList())
+
+                        val expanded =
+                            (queue + related)
+                                .distinctBy { it.sourceUrl }
+
+                        playbackQueue = expanded
+
+                        val activeIndex =
+                            expanded.indexOfFirst {
+                                it.sourceUrl == active.sourceUrl
+                            }.takeIf { it >= 0 } ?: 0
+
+                        val next =
+                            expanded.getOrNull(activeIndex + 1)
+                                ?: expanded.firstOrNull {
+                                    it.sourceUrl != active.sourceUrl
+                                }
+
+                        if (next != null) {
+                            playSong(
+                                song = next,
+                                queue = expanded,
+                                skipAttempts = 0
+                            )
+                        } else {
+                            buffering = false
+                        }
+                    }
+                return
+            }
 
             playSong(
-                song = queue[nextIndex],
+                song = queue[currentIndex + 1],
                 queue = queue,
                 skipAttempts = 0
             )
@@ -524,8 +586,7 @@ class MainActivity : ComponentActivity() {
         fun openSearchResult(item: MusicSearchItem) {
             if (item.kind == SearchKind.SONG) {
                 val song = item.toSongOrNull() ?: return
-                val queue = searchResults.mapNotNull { it.toSongOrNull() }
-                playSong(song, queue)
+                startRecommendationRadio(song)
                 return
             }
 
@@ -726,7 +787,7 @@ class MainActivity : ComponentActivity() {
                                 selectedMood = selectedMood,
                                 loading = loadingHome,
                                 onMood = { selectedMood = it },
-                                onPlay = { playSong(it) },
+                                onPlay = { startRecommendationRadio(it) },
                                 onFavorite = { toggleFavorite(it) },
                                 favoriteCheck = { isFavorite(it) },
                                 onSearch = { selectedTab = MainTab.SEARCH },
@@ -846,15 +907,7 @@ class MainActivity : ComponentActivity() {
                             onRadio = {
                                 val song = currentSong!!
                                 showSongMenu = false
-                                lifecycleScope.launch {
-                                    val radio =
-                                        runCatching {
-                                            MusicRepository.searchSongs(song.artist + " similar songs")
-                                        }.getOrDefault(emptyList())
-                                    if (radio.isNotEmpty()) {
-                                        playSong(radio.first(), radio)
-                                    }
-                                }
+                                startRecommendationRadio(song)
                             },
                             onLyrics = {
                                 playerPane = PlayerPane.LYRICS
