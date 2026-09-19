@@ -1,0 +1,50 @@
+name: Build Dhunora APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Create release key
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/dhunora-release.jks" \
+            -storepass dhunora123 \
+            -keypass dhunora123 \
+            -alias dhunora \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Alok, OU=Dhunora, O=Alok, L=India, C=IN"
+          echo "DHUNORA_KEYSTORE=$RUNNER_TEMP/dhunora-release.jks" >> "$GITHUB_ENV"
+          echo "DHUNORA_STORE_PASSWORD=dhunora123" >> "$GITHUB_ENV"
+          echo "DHUNORA_KEY_ALIAS=dhunora" >> "$GITHUB_ENV"
+          echo "DHUNORA_KEY_PASSWORD=dhunora123" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk Dhunora-v0.1.0-release.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dhunora-v0.1.0-release
+          path: Dhunora-v0.1.0-release.apk
+          if-no-files-found: error
