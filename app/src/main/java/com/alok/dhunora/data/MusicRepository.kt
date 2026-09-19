@@ -42,6 +42,13 @@ object MusicRepository {
                 when (kind) {
                     SearchKind.SONG ->
                         coroutineScope {
+                            val ytmJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        YouTubeMusicApi.searchSongs(clean)
+                                    }.getOrDefault(emptyList())
+                                }
+
                             val musicJob =
                                 async(Dispatchers.IO) {
                                     runCatching {
@@ -53,41 +60,26 @@ object MusicRepository {
                                     }.getOrDefault(emptyList())
                                 }
 
-                            val generalJob =
+                            val fallbackJob =
                                 async(Dispatchers.IO) {
                                     runCatching {
                                         doGeneralSongSearch(clean)
                                     }.getOrDefault(emptyList())
                                 }
 
-                            val audioJob =
-                                async(Dispatchers.IO) {
-                                    runCatching {
-                                        doGeneralSongSearch(clean + " official audio")
-                                    }.getOrDefault(emptyList())
-                                }
-
-                            val songJob =
-                                async(Dispatchers.IO) {
-                                    runCatching {
-                                        doGeneralSongSearch(clean + " song")
-                                    }.getOrDefault(emptyList())
-                                }
+                            val ytm =
+                                ytmJob.await()
+                                    .sortedByDescending { scoreSongResult(clean, it) }
 
                             val music =
                                 musicJob.await()
                                     .sortedByDescending { scoreSongResult(clean, it) }
 
                             val fallback =
-                                (
-                                    generalJob.await() +
-                                        audioJob.await() +
-                                        songJob.await()
-                                )
-                                    .distinctBy { it.sourceUrl }
+                                fallbackJob.await()
                                     .sortedByDescending { scoreSongResult(clean, it) }
 
-                            (music + fallback)
+                            (ytm + music + fallback)
                                 .distinctBy { it.sourceUrl }
                                 .take(50)
                         }
@@ -274,6 +266,13 @@ object MusicRepository {
 
             val searched =
                 coroutineScope {
+                    val ytmJob =
+                        async(Dispatchers.IO) {
+                            runCatching {
+                                YouTubeMusicApi.searchSongs(song.artist + " " + song.title)
+                            }.getOrDefault(emptyList())
+                        }
+
                     val artistJob =
                         async(Dispatchers.IO) {
                             runCatching {
@@ -285,18 +284,7 @@ object MusicRepository {
                             }.getOrDefault(emptyList())
                         }
 
-                    val similarJob =
-                        async(Dispatchers.IO) {
-                            runCatching {
-                                doSearch(
-                                    song.title + " " + song.artist,
-                                    YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
-                                    SearchKind.SONG
-                                )
-                            }.getOrDefault(emptyList())
-                        }
-
-                    (artistJob.await() + similarJob.await())
+                    (ytmJob.await() + artistJob.await())
                         .mapNotNull { it.toSongOrNull() }
                 }
 
@@ -415,7 +403,7 @@ object MusicRepository {
                                 sourceUrl = stream.url,
                                 durationSeconds = stream.duration.coerceAtLeast(0),
                                 thumbnailUrl =
-                                    youtubeThumbnail(stream.url) ?: bestThumbnail(stream.thumbnails)
+                                    bestThumbnail(stream.thumbnails) ?: youtubeThumbnail(stream.url)
                             )
                         }.distinctBy { it.sourceUrl }
                     }.getOrDefault(emptyList())
@@ -442,7 +430,7 @@ object MusicRepository {
                             sourceUrl = stream.url,
                             durationSeconds = stream.duration.coerceAtLeast(0),
                             thumbnailUrl =
-                                youtubeThumbnail(stream.url) ?: bestThumbnail(stream.thumbnails)
+                                bestThumbnail(stream.thumbnails) ?: youtubeThumbnail(stream.url)
                         )
                     }.distinctBy { it.sourceUrl }
                 }.getOrDefault(emptyList())
@@ -510,7 +498,7 @@ object MusicRepository {
     }
 
     fun artworkFor(song: Song): String? =
-        youtubeThumbnail(song.sourceUrl) ?: song.thumbnailUrl?.takeIf { it.isNotBlank() }
+        song.thumbnailUrl?.takeIf { it.isNotBlank() } ?: youtubeThumbnail(song.sourceUrl)
 
     private fun bestThumbnail(images: List<org.schabi.newpipe.extractor.Image>): String? =
         images
