@@ -267,7 +267,7 @@ object MusicRepository {
                     kind = SearchKind.ARTIST,
                     title = name,
                     subtitle =
-                        if (subscriberCount > 0) {
+                        if (subscriberCount in 1..99_999_999) {
                             formatCount(subscriberCount) + " subscribers"
                         } else {
                             "Artist"
@@ -692,6 +692,35 @@ object MusicRepository {
                 image.width.coerceAtLeast(1) * image.height.coerceAtLeast(1)
             }
             ?.url
+            ?.let(::upgradeThumbnailUrl)
+
+    fun upgradeThumbnailUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+
+        val googleLike =
+            url.contains("googleusercontent.com") ||
+                url.contains("ggpht.com") ||
+                url.contains("yt3.")
+
+        return when {
+            googleLike && Regex("=w\\d+-h\\d+").containsMatchIn(url) ->
+                url.replace(
+                    Regex("=w\\d+-h\\d+[^?]*$"),
+                    "=w1200-h1200-l90-rj"
+                )
+
+            googleLike && Regex("w\\d+-h\\d+").containsMatchIn(url) ->
+                url.replace(Regex("w\\d+-h\\d+"), "w1200-h1200")
+
+            url.contains("i.ytimg.com/vi/") ->
+                url.replace(
+                    Regex("/(default|mqdefault|hqdefault|sddefault|maxresdefault)\\.jpg.*$"),
+                    "/sddefault.jpg"
+                )
+
+            else -> url
+        }
+    }
             ?.let(::highQualityThumbnail)
 
     private fun youtubeThumbnail(url: String): String? {
