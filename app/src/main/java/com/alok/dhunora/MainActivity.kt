@@ -300,6 +300,9 @@ class MainActivity : ComponentActivity() {
         var youtubeLoggedIn by remember { mutableStateOf(AccountSession.isLoggedIn(this@MainActivity)) }
         var youtubeLikedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
         var youtubeLikedLoading by remember { mutableStateOf(false) }
+        var downloads by remember {
+            mutableStateOf(DownloadedSongStore.records(this@MainActivity))
+        }
         var positionMs by remember { mutableLongStateOf(0L) }
         var durationMs by remember { mutableLongStateOf(1L) }
 
@@ -382,9 +385,12 @@ class MainActivity : ComponentActivity() {
             error = null
 
             lifecycleScope.launch {
-                val resolved = runCatching {
-                    MusicRepository.resolveAudioUrl(song)
-                }
+                val resolved =
+                    if (!song.localUri.isNullOrBlank()) {
+                        Result.success(song.localUri)
+                    } else {
+                        runCatching { MusicRepository.resolveAudioUrl(song) }
+                    }
 
                 resolved.onSuccess { url ->
                     currentSong = song
@@ -394,15 +400,37 @@ class MainActivity : ComponentActivity() {
                                 .filterNot { it.sourceUrl == song.sourceUrl }
                                 .take(19)
 
-                    player.setMediaItem(MediaItem.fromUri(url))
+                    val metadata =
+                        MediaMetadata.Builder()
+                            .setTitle(song.title)
+                            .setArtist(song.artist)
+                            .setAlbumTitle("Dhunora")
+                            .apply {
+                                MusicRepository.artworkFor(song)
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { setArtworkUri(Uri.parse(it)) }
+                            }
+                            .build()
+
+                    val mediaItem =
+                        MediaItem.Builder()
+                            .setMediaId(song.sourceUrl)
+                            .setUri(url)
+                            .setMediaMetadata(metadata)
+                            .build()
+
+                    player.setMediaItem(mediaItem)
                     player.prepare()
                     player.play()
-                    isPlaying = true
-                    buffering = false
+                    buffering = true
 
-                    prefetchFollowing(song, resolvedQueue)
+                    if (song.localUri.isNullOrBlank()) {
+                        prefetchFollowing(song, resolvedQueue)
+                    }
                 }.onFailure {
-                    MusicRepository.invalidateAudioUrl(song)
+                    if (song.localUri.isNullOrBlank()) {
+                        MusicRepository.invalidateAudioUrl(song)
+                    }
 
                     if (resolvedQueue.size > 1 && skipAttempts < resolvedQueue.size - 1) {
                         val failedIndex =
@@ -471,20 +499,26 @@ class MainActivity : ComponentActivity() {
             selectedTab = MainTab.SEARCH
             loadingSearch = true
             error = null
-            lifecycleScope.launch {
-                runCatching { MusicRepository.search(term.trim(), kind) }
-                    .onSuccess {
-                        searchResults = it
-                        if (kind == SearchKind.SONG) {
-                            val likelyNext = it.mapNotNull { result -> result.toSongOrNull() }.take(2)
-                            lifecycleScope.launch {
-                                MusicRepository.prefetchAudioUrls(likelyNext)
+            searchJob?.cancel()
+            searchJob =
+                lifecycleScope.launch {
+                    try {
+                        runCatching { MusicRepository.search(term.trim(), kind) }
+                            .onSuccess {
+                                searchResults = it
+                                if (kind == SearchKind.SONG) {
+                                    val likelyNext =
+                                        it.mapNotNull { result -> result.toSongOrNull() }.take(2)
+                                    lifecycleScope.launch {
+                                        MusicRepository.prefetchAudioUrls(likelyNext)
+                                    }
+                                }
                             }
-                        }
+                            .onFailure { error = it.message ?: "Search failed" }
+                    } finally {
+                        loadingSearch = false
                     }
-                    .onFailure { error = it.message ?: "Search failed" }
-                loadingSearch = false
-            }
+                }
         }
 
         fun openSearchResult(item: MusicSearchItem) {
@@ -503,6 +537,25 @@ class MainActivity : ComponentActivity() {
                     .onSuccess { openedSearchSongs = it }
                     .onFailure { error = it.message ?: "Could not load " + item.kind.label.lowercase() }
                 loadingSearchDetail = false
+            }
+        }
+
+        LaunchedEffect(searchText, selectedSearchKind, selectedTab) {
+            if (
+                selectedTab == MainTab.SEARCH &&
+                searchText.trim().length >= 2
+            ) {
+                delay(450)
+                runSearch(searchText, selectedSearchKind)
+            }
+        }
+
+        LaunchedEffect(selectedTab) {
+            if (selectedTab == MainTab.LIBRARY) {
+                while (true) {
+                    downloads = DownloadedSongStore.records(this@MainActivity)
+                    delay(1500)
+                }
             }
         }
 
@@ -548,12 +601,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(currentSong) {
+        LaunchedEffect(currentSong, playerExpanded) {
             while (currentSong != null) {
                 positionMs = player.currentPosition.coerceAtLeast(0L)
                 durationMs = player.duration.takeIf { it > 0 } ?: 1L
-                isPlaying = player.isPlaying
-                delay(650)
+                delay(if (playerExpanded) 500 else 1500)
             }
         }
 
@@ -561,6 +613,14 @@ class MainActivity : ComponentActivity() {
             val failedSong = currentSong
             val listener =
                 object : Player.Listener {
+                    override fun onIsPlayingChanged(value: Boolean) {
+                        isPlaying = value
+                    }
+
+                    override fun onPlaybackStateChanged(state: Int) {
+                        buffering = state == Player.STATE_BUFFERING
+                    }
+
                     override fun onPlayerError(errorValue: PlaybackException) {
                         failedSong?.let { MusicRepository.invalidateAudioUrl(it) }
                         buffering = true
@@ -700,6 +760,7 @@ class MainActivity : ComponentActivity() {
                                 youtubeLoggedIn = youtubeLoggedIn,
                                 youtubeLoading = youtubeLikedLoading,
                                 myPlaylist = LocalPlaylistStore.myPlaylist(this@MainActivity),
+                                downloads = downloads,
                                 onPlay = { playSong(it) },
                                 onFavorite = { toggleFavorite(it) },
                                 onSearch = { selectedTab = MainTab.SEARCH },
