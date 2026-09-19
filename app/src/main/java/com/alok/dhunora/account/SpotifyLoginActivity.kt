@@ -86,6 +86,7 @@ class SpotifyLoginActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         factory = { context ->
                             WebView(context).apply {
+                                cookieManager.setAcceptThirdPartyCookies(this, true)
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.databaseEnabled = true
@@ -131,7 +132,15 @@ class SpotifyLoginActivity : ComponentActivity() {
                                                     ?.substringAfter('=')
                                                     .orEmpty()
 
-                                            if (spDc.isNotBlank()) {
+                                            val isStatusPage =
+                                                url?.matches(
+                                                    Regex(
+                                                        "^https://accounts\\.spotify\\.com/" +
+                                                            "(?:[^/]+/)?status(?:\\?.*)?$"
+                                                    )
+                                                ) == true
+
+                                            if (spDc.isNotBlank() && isStatusPage) {
                                                 SpotifySession.saveSpDc(
                                                     this@SpotifyLoginActivity,
                                                     spDc
@@ -148,7 +157,7 @@ class SpotifyLoginActivity : ComponentActivity() {
 
                                 loadUrl(
                                     "https://accounts.spotify.com/login" +
-                                        "?continue=https%3A%2F%2Fopen.spotify.com%2F"
+                                        "?continue=https%3A%2F%2Faccounts.spotify.com%2Fen%2Fstatus"
                                 )
                             }
                         }
