@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -125,6 +126,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -136,6 +138,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import androidx.palette.graphics.Palette
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -158,12 +161,15 @@ import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
 import com.alok.dhunora.player.PlaybackService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URL
 import java.util.Calendar
 
 private enum class MainTab { HOME, MIX, LIBRARY, SEARCH }
@@ -2994,12 +3000,44 @@ private fun NowPlayingScreen(
     var dragging by remember { mutableFloatStateOf(fraction) }
     LaunchedEffect(fraction) { dragging = fraction }
 
+    var artworkTone by remember(song.sourceUrl) {
+        mutableStateOf(Color(0xFF8F132B))
+    }
+
+    LaunchedEffect(song.sourceUrl, song.thumbnailUrl) {
+        val url = MusicRepository.artworkFor(song)
+        if (!url.isNullOrBlank()) {
+            val extracted =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        URL(url).openStream().use { stream ->
+                            BitmapFactory.decodeStream(stream)?.let { bitmap ->
+                                Palette.from(bitmap).generate().let { palette ->
+                                    palette.darkMutedSwatch?.rgb
+                                        ?: palette.mutedSwatch?.rgb
+                                        ?: palette.darkVibrantSwatch?.rgb
+                                        ?: palette.dominantSwatch?.rgb
+                                }
+                            }
+                        }
+                    }.getOrNull()
+                }
+
+            if (extracted != null) {
+                artworkTone = Color(extracted)
+            }
+        }
+    }
+
     val topColor =
-        if (style == "Immersive") Color(0xFFC41434)
-        else Color(0xFF8F132B)
+        if (style == "Immersive") artworkTone
+        else lerp(artworkTone, Color.Black, 0.16f)
     val midColor =
-        if (liquidGlass) Color(0xFF351519)
-        else Color(0xFF211316)
+        lerp(
+            artworkTone,
+            Color.Black,
+            if (liquidGlass) 0.62f else 0.72f
+        )
 
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         LazyColumn(
