@@ -994,7 +994,9 @@ private fun SearchScreen(
     onKindChange: (SearchKind) -> Unit,
     onOpen: (MusicSearchItem) -> Unit,
     onFavorite: (Song) -> Unit,
-    favoriteCheck: (Song) -> Boolean
+    favoriteCheck: (Song) -> Boolean,
+    accountConnected: Boolean,
+    onAccount: () -> Unit
 ) {
     val focus = LocalFocusManager.current
     val browse = listOf(
@@ -1024,12 +1026,24 @@ private fun SearchScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Surface(
-                    modifier = Modifier.size(40.dp),
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .clickable(onClick = onAccount),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color =
+                        if (accountConnected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Person, null, modifier = Modifier.size(22.dp))
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = "Account",
+                            modifier = Modifier.size(22.dp),
+                            tint =
+                                if (accountConnected) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
@@ -1477,9 +1491,14 @@ private fun LibraryScreen(
     modifier: Modifier,
     favorites: List<Song>,
     recent: List<Song>,
+    youtubeLiked: List<Song>,
+    youtubeLoggedIn: Boolean,
+    youtubeLoading: Boolean,
+    myPlaylist: List<Song>,
     onPlay: (Song) -> Unit,
     onFavorite: (Song) -> Unit,
-    onSearch: () -> Unit
+    onSearch: () -> Unit,
+    onAccount: () -> Unit
 ) {
     var filter by rememberSaveable { mutableStateOf("Playlists") }
     val filters = listOf("Playlists", "Songs", "Albums", "Artists")
@@ -1493,9 +1512,23 @@ private fun LibraryScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                Surface(
+                    modifier = Modifier.size(42.dp).clickable(onClick = onAccount),
+                    shape = CircleShape,
+                    color =
+                        if (youtubeLoggedIn) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("A", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Black)
+                        if (youtubeLoggedIn) {
+                            Text(
+                                "Y",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Black
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Person, "Account")
+                        }
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -1518,11 +1551,36 @@ private fun LibraryScreen(
             }
 
             Spacer(Modifier.height(14.dp))
+            if (youtubeLoggedIn) {
+                LibraryHeroCard(
+                    title = "YouTube Liked Music",
+                    subtitle =
+                        if (youtubeLoading) "Syncing..."
+                        else youtubeLiked.size.toString() + " songs",
+                    icon = Icons.Rounded.Favorite,
+                    onClick = { youtubeLiked.firstOrNull()?.let(onPlay) }
+                )
+            } else {
+                LibraryHeroCard(
+                    title = "Connect YouTube Music",
+                    subtitle = "See your liked music and account library",
+                    icon = Icons.Rounded.Person,
+                    onClick = onAccount
+                )
+            }
+
             LibraryHeroCard(
                 title = "Liked songs",
-                subtitle = favorites.size.toString() + " songs",
+                subtitle = favorites.size.toString() + " local likes",
                 icon = Icons.Rounded.Favorite,
                 onClick = { favorites.firstOrNull()?.let(onPlay) }
+            )
+
+            LibraryHeroCard(
+                title = "My Playlist",
+                subtitle = myPlaylist.size.toString() + " songs",
+                icon = Icons.Rounded.PlaylistAdd,
+                onClick = { myPlaylist.firstOrNull()?.let(onPlay) }
             )
             LibraryHeroCard(
                 title = "Recently played",
@@ -1564,16 +1622,63 @@ private fun LibraryScreen(
             }
         }
 
-        if (favorites.isNotEmpty()) {
+        if (youtubeLoggedIn && youtubeLiked.isNotEmpty()) {
             item {
                 Text(
-                    "Liked songs",
+                    "YouTube Liked Music",
                     Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
                     fontSize = 23.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
-            items(favorites.take(12)) { song ->
+            items(
+                items = youtubeLiked.take(20),
+                key = { "yt:" + it.sourceUrl }
+            ) { song ->
+                SongListRow(
+                    song = song,
+                    favorite = true,
+                    onPlay = { onPlay(song) },
+                    onFavorite = { onFavorite(song) }
+                )
+            }
+        }
+
+        if (myPlaylist.isNotEmpty()) {
+            item {
+                Text(
+                    "My Playlist",
+                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            items(
+                items = myPlaylist.take(20),
+                key = { "localplaylist:" + it.sourceUrl }
+            ) { song ->
+                SongListRow(
+                    song = song,
+                    favorite = favorites.any { it.sourceUrl == song.sourceUrl },
+                    onPlay = { onPlay(song) },
+                    onFavorite = { onFavorite(song) }
+                )
+            }
+        }
+
+        if (favorites.isNotEmpty()) {
+            item {
+                Text(
+                    "Local liked songs",
+                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            items(
+                items = favorites.take(20),
+                key = { "localfav:" + it.sourceUrl }
+            ) { song ->
                 SongListRow(song, true, { onPlay(song) }, { onFavorite(song) })
             }
         }
@@ -1733,6 +1838,7 @@ private fun NowPlayingScreen(
     onTogglePlay: () -> Unit,
     onSeek: (Float) -> Unit,
     onFavorite: () -> Unit,
+    onMore: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onPane: (PlayerPane) -> Unit,
@@ -1766,7 +1872,9 @@ private fun NowPlayingScreen(
                     Text("NOW PLAYING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(song.artist, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
-                IconButton(onClick = {}) { Icon(Icons.Rounded.MoreVert, null) }
+                IconButton(onClick = onMore) {
+                    Icon(Icons.Rounded.MoreVert, "More")
+                }
             }
 
             Artwork(
@@ -2105,11 +2213,20 @@ private fun LibraryHeroCard(
 }
 
 @Composable
-private fun SettingsSheet() {
+private fun SettingsSheet(
+    youtubeLoggedIn: Boolean,
+    onAccount: () -> Unit
+) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 36.dp)) {
         Text("Dhunora", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
         Text("by Alok", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
+        SettingRow(
+            Icons.Rounded.Person,
+            if (youtubeLoggedIn) "YouTube Music connected" else "Connect YouTube Music",
+            if (youtubeLoggedIn) "Liked music sync is enabled" else "Sign in with your Google account",
+            onClick = onAccount
+        )
         SettingRow(Icons.Rounded.Tune, "Interface", "SimpMusic-inspired floating navigation")
         SettingRow(Icons.Rounded.MusicNote, "Playback", "YouTube / YouTube Music stream resolver")
         SettingRow(Icons.Rounded.Favorite, "Library", "Likes are saved locally on your phone")
@@ -2124,8 +2241,19 @@ private fun SettingsSheet() {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, subtitle: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun SettingRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(14.dp))
         Column {
