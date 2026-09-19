@@ -49,6 +49,13 @@ object MusicRepository {
                                     }.getOrDefault(emptyList())
                                 }
 
+                            val webYouTubeJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        YouTubeSearchApi.searchVideos(clean)
+                                    }.getOrDefault(emptyList())
+                                }
+
                             val musicJob =
                                 async(Dispatchers.IO) {
                                     runCatching {
@@ -90,6 +97,7 @@ object MusicRepository {
 
                             (
                                 ytmJob.await() +
+                                    webYouTubeJob.await() +
                                     musicJob.await() +
                                     generalJob.await() +
                                     officialVideoJob.await() +
@@ -124,7 +132,12 @@ object MusicRepository {
                                     )
                                 }.getOrDefault(emptyList())
 
-                            (primary + channels)
+                            val webArtists =
+                                runCatching {
+                                    YouTubeSearchApi.searchArtists(clean)
+                                }.getOrDefault(emptyList())
+
+                            (webArtists + primary + channels)
                                 .distinctBy { it.sourceUrl }
                                 .sortedByDescending { item ->
                                     val q = normalize(clean)
