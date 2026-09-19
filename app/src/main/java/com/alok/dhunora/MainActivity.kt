@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +62,11 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
@@ -95,6 +101,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -121,6 +128,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,6 +149,7 @@ import com.alok.dhunora.data.DownloadedSongStore
 import com.alok.dhunora.data.ListeningProfileStore
 import com.alok.dhunora.data.LocalPlaylistStore
 import com.alok.dhunora.data.MusicRepository
+import com.alok.dhunora.data.UiSettingsStore
 import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
@@ -153,8 +162,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
-private enum class MainTab { HOME, LIBRARY, SEARCH }
+private enum class MainTab { HOME, MIX, LIBRARY, SEARCH }
 private enum class PlayerPane { UP_NEXT, LYRICS }
+
+private data class LibraryCollection(
+    val title: String,
+    val subtitle: String,
+    val songs: List<Song> = emptyList(),
+    val downloads: List<DownloadRecord> = emptyList()
+)
 
 class MainActivity : ComponentActivity() {
     private lateinit var player: MediaController
@@ -305,6 +321,25 @@ class MainActivity : ComponentActivity() {
         var youtubeLikedLoading by remember { mutableStateOf(false) }
         var downloads by remember {
             mutableStateOf(DownloadedSongStore.records(this@MainActivity))
+        }
+        var libraryCollection by remember { mutableStateOf<LibraryCollection?>(null) }
+        var translucentNav by rememberSaveable {
+            mutableStateOf(UiSettingsStore.translucentNav(this@MainActivity))
+        }
+        var liquidGlass by rememberSaveable {
+            mutableStateOf(UiSettingsStore.liquidGlass(this@MainActivity))
+        }
+        var romanizedLyrics by rememberSaveable {
+            mutableStateOf(UiSettingsStore.romanizedLyrics(this@MainActivity))
+        }
+        var nowPlayingStyle by rememberSaveable {
+            mutableStateOf(UiSettingsStore.nowPlayingStyle(this@MainActivity))
+        }
+        var lyricsStyle by rememberSaveable {
+            mutableStateOf(UiSettingsStore.lyricsStyle(this@MainActivity))
+        }
+        var themeColor by rememberSaveable {
+            mutableStateOf(UiSettingsStore.themeColor(this@MainActivity))
         }
         var positionMs by remember { mutableLongStateOf(0L) }
         var durationMs by remember { mutableLongStateOf(1L) }
