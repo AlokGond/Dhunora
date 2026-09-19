@@ -139,7 +139,11 @@ class LoginActivity : ComponentActivity() {
                                             }
                                         }
                                     }
-                                loadUrl("https://music.youtube.com/")
+                                loadUrl(
+                                    "https://accounts.google.com/ServiceLogin" +
+                                        "?service=youtube" +
+                                        "&continue=https%3A%2F%2Fmusic.youtube.com%2F"
+                                )
                             }
                         }
                     )
