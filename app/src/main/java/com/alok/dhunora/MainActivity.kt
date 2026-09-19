@@ -151,10 +151,14 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.alok.dhunora.account.AccountSession
 import com.alok.dhunora.account.AccountProfileRepository
 import com.alok.dhunora.account.LoginActivity
+import com.alok.dhunora.account.SpotifyLoginActivity
+import com.alok.dhunora.account.SpotifySession
 import com.alok.dhunora.data.DownloadRecord
 import com.alok.dhunora.data.DownloadedSongStore
 import com.alok.dhunora.data.ListeningProfileStore
 import com.alok.dhunora.data.LocalPlaylistStore
+import com.alok.dhunora.data.LyricsRepository
+import com.alok.dhunora.data.LyricsResult
 import com.alok.dhunora.data.MusicRepository
 import com.alok.dhunora.data.UiSettingsStore
 import com.alok.dhunora.model.MusicSearchItem
@@ -327,6 +331,11 @@ class MainActivity : ComponentActivity() {
         var showSongMenu by remember { mutableStateOf(false) }
         var showAccountSheet by remember { mutableStateOf(false) }
         var youtubeLoggedIn by remember { mutableStateOf(AccountSession.isLoggedIn(this@MainActivity)) }
+        var spotifyLoggedIn by remember {
+            mutableStateOf(SpotifySession.isLoggedIn(this@MainActivity))
+        }
+        var lyricsResult by remember { mutableStateOf<LyricsResult?>(null) }
+        var lyricsLoading by remember { mutableStateOf(false) }
         var profileName by remember {
             mutableStateOf(AccountSession.profileName(this@MainActivity))
         }
@@ -386,6 +395,29 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+
+        val spotifyLoginLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) {
+                spotifyLoggedIn = SpotifySession.isLoggedIn(this@MainActivity)
+            }
+
+        fun openSpotify() {
+            if (spotifyLoggedIn) {
+                SpotifySession.clear(this@MainActivity)
+                spotifyLoggedIn = false
+                Toast.makeText(
+                    this@MainActivity,
+                    "Spotify disconnected",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                spotifyLoginLauncher.launch(
+                    Intent(this@MainActivity, SpotifyLoginActivity::class.java)
+                )
+            }
+        }
 
         fun openAccount() {
             if (youtubeLoggedIn) {
@@ -698,6 +730,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        LaunchedEffect(currentSong?.sourceUrl, spotifyLoggedIn) {
+            val active = currentSong
+            if (active == null) {
+                lyricsResult = null
+                lyricsLoading = false
+            } else {
+                lyricsLoading = true
+                lyricsResult =
+                    runCatching {
+                        LyricsRepository.load(this@MainActivity, active)
+                    }.getOrNull()
+                lyricsLoading = false
+            }
+        }
+
         val homeProfileKey =
             (
                 recentSongs.take(8) +
@@ -845,7 +892,10 @@ class MainActivity : ComponentActivity() {
                         onRadio = { startRecommendationRadio(currentSong!!) },
                         style = nowPlayingStyle,
                         liquidGlass = liquidGlass,
-                        romanizedLyrics = romanizedLyrics
+                        romanizedLyrics = romanizedLyrics,
+                        lyricsLines = lyricsResult?.lines.orEmpty(),
+                        lyricsSource = lyricsResult?.source,
+                        lyricsLoading = lyricsLoading
                     )
                 } else if (openedSearchItem != null) {
                     CollectionDetailScreen(
@@ -885,6 +935,7 @@ class MainActivity : ComponentActivity() {
                 } else if (showSettings) {
                     SettingsScreen(
                         youtubeLoggedIn = youtubeLoggedIn,
+                        spotifyLoggedIn = spotifyLoggedIn,
                         translucentNav = translucentNav,
                         liquidGlass = liquidGlass,
                         romanizedLyrics = romanizedLyrics,
@@ -895,6 +946,9 @@ class MainActivity : ComponentActivity() {
                         onAccount = {
                             showSettings = false
                             openAccount()
+                        },
+                        onSpotify = {
+                            openSpotify()
                         },
                         onTranslucentNav = {
                             translucentNav = it
@@ -2992,7 +3046,10 @@ private fun NowPlayingScreen(
     onRadio: () -> Unit,
     style: String,
     liquidGlass: Boolean,
-    romanizedLyrics: Boolean
+    romanizedLyrics: Boolean,
+    lyricsLines: List<String>,
+    lyricsSource: String?,
+    lyricsLoading: Boolean
 ) {
     val fraction =
         (positionMs.toFloat() / durationMs.toFloat())
@@ -3293,6 +3350,9 @@ private fun NowPlayingScreen(
                 if (pane == PlayerPane.LYRICS) {
                     LyricsPreviewCard(
                         romanized = romanizedLyrics,
+                        lines = lyricsLines,
+                        source = lyricsSource,
+                        loading = lyricsLoading,
                         onShowQueue = { onPane(PlayerPane.UP_NEXT) }
                     )
                 } else {
@@ -3332,6 +3392,9 @@ private fun PlayerActionIcon(
 @Composable
 private fun LyricsPreviewCard(
     romanized: Boolean,
+    lines: List<String>,
+    source: String?,
+    loading: Boolean,
     onShowQueue: () -> Unit
 ) {
     Card(
@@ -3366,21 +3429,34 @@ private fun LyricsPreviewCard(
 
             Spacer(Modifier.height(20.dp))
 
-            Text(
-                if (romanized)
-                    "Line-synced lyrics will appear here in your selected script."
-                else
-                    "Line-synced lyrics will appear here when available.",
-                color = Color.White.copy(alpha = 0.62f),
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 31.sp
-            )
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.White
+                )
+            } else {
+                Text(
+                    when {
+                        lines.isNotEmpty() -> lines.take(6).joinToString("\n\n")
+                        romanized -> "Lyrics will appear here when a matching source is available."
+                        else -> "Lyrics are not available for this track yet."
+                    },
+                    color = Color.White.copy(
+                        alpha = if (lines.isNotEmpty()) 0.72f else 0.56f
+                    ),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 28.sp,
+                    maxLines = 12,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-            Spacer(Modifier.height(42.dp))
+            Spacer(Modifier.height(34.dp))
 
             Text(
-                "Lyrics",
+                source?.let { "Lyrics provided by $it" } ?: "Lyrics",
                 color = Color.White.copy(alpha = 0.65f),
                 fontSize = 12.sp,
                 modifier = Modifier.align(Alignment.End)
@@ -3968,6 +4044,7 @@ private fun AccountSheet(
 @Composable
 private fun SettingsScreen(
     youtubeLoggedIn: Boolean,
+    spotifyLoggedIn: Boolean,
     translucentNav: Boolean,
     liquidGlass: Boolean,
     romanizedLyrics: Boolean,
@@ -3976,6 +4053,7 @@ private fun SettingsScreen(
     themeColor: String,
     onBack: () -> Unit,
     onAccount: () -> Unit,
+    onSpotify: () -> Unit,
     onTranslucentNav: (Boolean) -> Unit,
     onLiquidGlass: (Boolean) -> Unit,
     onRomanizedLyrics: (Boolean) -> Unit,
@@ -4107,8 +4185,25 @@ private fun SettingsScreen(
 
             SettingsValueRow(
                 title = "Playback source",
-                value = "YouTube Music / YouTube",
+                value = "YouTube Music API + YouTube stream extraction",
                 onClick = {}
+            )
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSectionTitle("Spotify")
+
+            SettingsValueRow(
+                title =
+                    if (spotifyLoggedIn)
+                        "Disconnect Spotify"
+                    else
+                        "Connect Spotify",
+                value =
+                    if (spotifyLoggedIn)
+                        "Connected • Spotify lyrics enabled with LRCLIB fallback"
+                    else
+                        "Optional • used for lyrics, not song streaming",
+                onClick = onSpotify
             )
 
             Spacer(Modifier.height(24.dp))
