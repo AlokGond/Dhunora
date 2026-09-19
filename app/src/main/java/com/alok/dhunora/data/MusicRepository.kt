@@ -301,32 +301,28 @@ object MusicRepository {
     suspend fun personalizedHome(
         recent: List<Song>,
         favorites: List<Song>,
-        accountLikes: List<Song>
+        accountLikes: List<Song>,
+        searchTerms: List<String> = emptyList()
     ): List<Song> =
         withContext(Dispatchers.IO) {
             val seeds =
-                (recent.take(12) + favorites.take(8) + accountLikes.take(8))
+                (recent.take(15) + favorites.take(8) + accountLikes.take(8))
                     .filter { it.artist.isNotBlank() }
-                    .distinctBy { it.sourceUrl }
+                    .distinctBy(::songIdentity)
 
-            if (seeds.isEmpty()) {
-                return@withContext runCatching {
-                    doSearch(
-                        "Top music India",
-                        YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
-                        SearchKind.SONG
-                    ).mapNotNull { it.toSongOrNull() }
-                }.getOrDefault(emptyList())
-            }
+            val blockedKeys =
+                (recent.take(35) + favorites.take(20) + accountLikes.take(20))
+                    .map(::songIdentity)
+                    .toSet()
 
             val artistCounts = linkedMapOf<String, Int>()
             seeds.forEachIndexed { index, song ->
-                val weight = (seeds.size - index).coerceAtLeast(1)
                 val artist = song.artist.trim()
                 if (
                     artist.isNotBlank() &&
                     !artist.equals("Unknown artist", ignoreCase = true)
                 ) {
+                    val weight = (seeds.size - index).coerceAtLeast(1)
                     artistCounts[artist] = (artistCounts[artist] ?: 0) + weight
                 }
             }
@@ -335,59 +331,147 @@ object MusicRepository {
                 artistCounts.entries
                     .sortedByDescending { it.value }
                     .map { it.key }
-                    .take(4)
+                    .take(5)
 
-            val queries = mutableListOf<String>()
-            topArtists.forEach { artist ->
-                queries += artist + " hits"
-            }
+            val queries =
+                buildList {
+                    searchTerms
+                        .map { it.trim() }
+                        .filter { it.length >= 2 }
+                        .distinctBy { it.lowercase() }
+                        .take(6)
+                        .forEach { add(it) }
 
-            seeds.take(3).forEach { seed ->
-                queries += seed.title + " " + seed.artist
-            }
+                    topArtists.forEach { artist ->
+                        add("$artist songs")
+                    }
 
-            if (queries.size < 4) {
-                queries += listOf(
-                    "New Bollywood music",
-                    "Trending Punjabi songs",
-                    "Indian music hits"
-                )
-            }
+                    if (size < 5) {
+                        add("new Indian songs")
+                        add("trending music India")
+                        add("popular music India")
+                    }
+                }
+                    .distinctBy { it.lowercase() }
+                    .take(10)
+
+            val relatedSeeds =
+                seeds
+                    .take(5)
+                    .shuffled()
+                    .take(3)
 
             val buckets =
                 coroutineScope {
-                    queries
-                        .distinct()
-                        .take(7)
-                        .map { query ->
+                    val queryJobs =
+                        queries.map { query ->
                             async(Dispatchers.IO) {
-                                runCatching {
-                                    doSearch(
-                                        query,
-                                        YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
-                                        SearchKind.SONG
-                                    ).mapNotNull { it.toSongOrNull() }
-                                }.getOrDefault(emptyList())
+                                val ytm =
+                                    runCatching {
+                                        YouTubeMusicApi.searchSongs(query)
+                                    }.getOrDefault(emptyList())
+                                        .mapNotNull { it.toSongOrNull() }
+
+                                val fallback =
+                                    if (ytm.size >= 8) {
+                                        emptyList()
+                                    } else {
+                                        runCatching {
+                                            doSearch(
+                                                query,
+                                                YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                                                SearchKind.SONG
+                                            ).mapNotNull { it.toSongOrNull() }
+                                        }.getOrDefault(emptyList())
+                                    }
+
+                                (ytm + fallback)
+                                    .distinctBy(::songIdentity)
+                                    .take(12)
+                                    .shuffled()
                             }
                         }
-                        .map { it.await() }
+
+                    val relatedJobs =
+                        relatedSeeds.map { seed ->
+                            async(Dispatchers.IO) {
+                                runCatching { relatedSongs(seed) }
+                                    .getOrDefault(emptyList())
+                                    .distinctBy(::songIdentity)
+                                    .take(12)
+                                    .shuffled()
+                            }
+                        }
+
+                    (queryJobs + relatedJobs).map { it.await() }
                 }
+                    .filter { it.isNotEmpty() }
+                    .shuffled()
+
+            if (buckets.isEmpty()) {
+                return@withContext runCatching {
+                    YouTubeMusicApi.searchSongs("trending music India")
+                        .mapNotNull { it.toSongOrNull() }
+                        .filter { songIdentity(it) !in blockedKeys }
+                        .distinctBy(::songIdentity)
+                        .shuffled()
+                }.getOrDefault(emptyList())
+            }
 
             val interleaved = mutableListOf<Song>()
             val maxSize = buckets.maxOfOrNull { it.size } ?: 0
             for (index in 0 until maxSize) {
                 buckets.forEach { bucket ->
-                    bucket.getOrNull(index)?.let { interleaved += it }
+                    bucket.getOrNull(index)?.let(interleaved::add)
                 }
             }
 
-            val seedUrls = seeds.map { it.sourceUrl }.toSet()
-
+            val artistUse = mutableMapOf<String, Int>()
             interleaved
-                .filter { it.sourceUrl !in seedUrls }
-                .distinctBy { it.sourceUrl }
-                .take(50)
+                .asSequence()
+                .filter { song ->
+                    val key = songIdentity(song)
+                    key !in blockedKeys &&
+                        song.title.isNotBlank() &&
+                        song.durationSeconds !in 1..44
+                }
+                .distinctBy(::songIdentity)
+                .filter { song ->
+                    val artist = normalize(song.artist)
+                    val count = artistUse[artist] ?: 0
+                    if (artist.isBlank() || count < 4) {
+                        if (artist.isNotBlank()) artistUse[artist] = count + 1
+                        true
+                    } else {
+                        false
+                    }
+                }
+                .take(60)
+                .toList()
         }
+
+    private fun songIdentity(song: Song): String {
+        val cleanTitle =
+            normalize(song.title)
+                .replace(Regex("\\b(official|video|audio|lyrics|lyrical|full|song|hd|4k)\\b"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+        val cleanArtist =
+            normalize(song.artist)
+                .replace(Regex("\\b(official|music|records|channel)\\b"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+
+        return "$cleanTitle|$cleanArtist"
+    }
+
+    private fun normalize(value: String): String =
+        value
+            .lowercase()
+            .replace(Regex("[^a-z0-9\\p{L}\\p{N}]+"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
 
     suspend fun loadCollection(item: MusicSearchItem): List<Song> =
         withContext(Dispatchers.IO) {
