@@ -2252,6 +2252,7 @@ private fun CollectionDetailScreen(
                 ) {
                     Text(
                         "No tracks available",
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -2267,6 +2268,7 @@ private fun CollectionDetailScreen(
                 Text(
                     if (item.kind == SearchKind.ARTIST) "Popular" else "Tracks",
                     Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                    color = Color.White,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
