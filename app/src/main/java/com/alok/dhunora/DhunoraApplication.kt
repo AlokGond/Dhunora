@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class DhunoraApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
-        NewPipe.init(OkHttpDownloader(), Localization("en", "IN"), ContentCountry("IN"))
+        NewPipe.init(OkHttpDownloader(this), Localization("en", "IN"), ContentCountry("IN"))
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
