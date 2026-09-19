@@ -60,30 +60,46 @@ object MusicRepository {
                                     }.getOrDefault(emptyList())
                                 }
 
-                            val fallbackJob =
+                            val generalJob =
                                 async(Dispatchers.IO) {
                                     runCatching {
                                         doGeneralSongSearch(clean)
                                     }.getOrDefault(emptyList())
                                 }
 
-                            val ytm =
-                                ytmJob.await()
-                                    .sortedByDescending { scoreSongResult(clean, it) }
+                            val officialVideoJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch("$clean official video")
+                                    }.getOrDefault(emptyList())
+                                }
 
-                            val music =
-                                musicJob.await()
-                                    .sortedByDescending { scoreSongResult(clean, it) }
+                            val songJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch("$clean song")
+                                    }.getOrDefault(emptyList())
+                                }
 
-                            val fallback =
-                                fallbackJob.await()
-                                    .sortedByDescending { scoreSongResult(clean, it) }
+                            val audioJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch("$clean official audio")
+                                    }.getOrDefault(emptyList())
+                                }
 
-                            (ytm + music + fallback)
+                            (
+                                ytmJob.await() +
+                                    musicJob.await() +
+                                    generalJob.await() +
+                                    officialVideoJob.await() +
+                                    songJob.await() +
+                                    audioJob.await()
+                            )
                                 .distinctBy { it.sourceUrl }
-                                .take(50)
+                                .sortedByDescending { scoreSongResult(clean, it) }
+                                .take(70)
                         }
-
                     else -> {
                         val filter =
                             when (kind) {
@@ -98,14 +114,29 @@ object MusicRepository {
                                 doSearch(clean, filter, kind)
                             }.getOrDefault(emptyList())
 
-                        if (kind == SearchKind.ARTIST && primary.isEmpty()) {
-                            runCatching {
-                                doSearch(
-                                    clean,
-                                    YoutubeSearchQueryHandlerFactory.CHANNELS,
-                                    kind
-                                )
-                            }.getOrDefault(emptyList())
+                        if (kind == SearchKind.ARTIST) {
+                            val channels =
+                                runCatching {
+                                    doSearch(
+                                        clean,
+                                        YoutubeSearchQueryHandlerFactory.CHANNELS,
+                                        kind
+                                    )
+                                }.getOrDefault(emptyList())
+
+                            (primary + channels)
+                                .distinctBy { it.sourceUrl }
+                                .sortedByDescending { item ->
+                                    val q = normalize(clean)
+                                    val title = normalize(item.title)
+                                    when {
+                                        title == q -> 100
+                                        title.startsWith(q) -> 80
+                                        title.contains(q) -> 60
+                                        else -> q.split(" ").count { it.isNotBlank() && title.contains(it) } * 10
+                                    }
+                                }
+                                .take(30)
                         } else {
                             primary
                         }
@@ -158,33 +189,46 @@ object MusicRepository {
         query: String,
         item: MusicSearchItem
     ): Int {
-        val q = query.lowercase().trim()
-        val haystack = (item.title + " " + item.subtitle).lowercase()
+        val q = normalize(query)
+        val title = normalize(item.title)
+        val haystack = normalize(item.title + " " + item.subtitle)
         val tokens =
             q.split(Regex("\\s+"))
                 .filter { it.length >= 2 }
                 .distinct()
 
         var score = 0
-        if (haystack.contains(q)) score += 40
-        score += tokens.count { haystack.contains(it) } * 9
+        if (title == q) score += 130
+        if (title.startsWith(q)) score += 85
+        if (haystack.contains(q)) score += 70
 
-        if (item.durationSeconds in 60..900) score += 8
+        val looseQ = q.replace("h", "")
+        val looseHaystack = haystack.replace("h", "")
+        if (looseQ.length >= 5 && looseHaystack.contains(looseQ)) score += 38
+
+        score += tokens.count { haystack.contains(it) } * 12
+        score += tokens.count {
+            val loose = it.replace("h", "")
+            loose.length >= 3 && looseHaystack.contains(loose)
+        } * 4
+
+        if (item.durationSeconds in 60..900) score += 10
         if (
+            haystack.contains("official video") ||
             haystack.contains("official audio") ||
-            haystack.contains("official song") ||
-            haystack.contains("music")
+            haystack.contains("official song")
         ) {
-            score += 6
+            score += 10
         }
 
         if (
             haystack.contains("reaction") ||
             haystack.contains("trailer") ||
             haystack.contains("shorts") ||
-            haystack.contains("status video")
+            haystack.contains("status video") ||
+            haystack.contains("whatsapp status")
         ) {
-            score -= 18
+            score -= 35
         }
 
         return score
@@ -494,7 +538,30 @@ object MusicRepository {
                 }
 
                 SearchKind.ARTIST -> {
-                    searchSongs(item.title + " songs").take(30)
+                    val exact =
+                        runCatching {
+                            YouTubeMusicApi.searchSongs(item.title)
+                                .mapNotNull { it.toSongOrNull() }
+                        }.getOrDefault(emptyList())
+
+                    val fallback =
+                        runCatching {
+                            searchSongs(item.title + " songs")
+                        }.getOrDefault(emptyList())
+
+                    (exact + fallback)
+                        .distinctBy(::songIdentity)
+                        .sortedByDescending { song ->
+                            val artist = normalize(song.artist)
+                            val target = normalize(item.title)
+                            when {
+                                artist == target -> 100
+                                artist.contains(target) -> 70
+                                target.split(" ").any { it.length >= 3 && artist.contains(it) } -> 35
+                                else -> 0
+                            }
+                        }
+                        .take(40)
                 }
             }
         }
@@ -582,7 +649,41 @@ object MusicRepository {
     }
 
     fun artworkFor(song: Song): String? =
-        song.thumbnailUrl?.takeIf { it.isNotBlank() } ?: youtubeThumbnail(song.sourceUrl)
+        highQualityThumbnail(
+            song.thumbnailUrl?.takeIf { it.isNotBlank() }
+                ?: youtubeThumbnail(song.sourceUrl)
+        )
+
+    fun highQualityThumbnail(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+
+        var upgraded = url
+
+        if (
+            upgraded.contains("googleusercontent.com") ||
+            upgraded.contains("ggpht.com") ||
+            upgraded.contains("yt3.ggpht.com")
+        ) {
+            upgraded =
+                upgraded
+                    .replace(Regex("w\\d+-h\\d+"), "w800-h800")
+                    .replace(Regex("=s\\d+(-c)?"), "=s800-c")
+        }
+
+        if (upgraded.contains("i.ytimg.com/vi/")) {
+            val id =
+                Regex("/vi/([A-Za-z0-9_-]{11})/")
+                    .find(upgraded)
+                    ?.groupValues
+                    ?.getOrNull(1)
+
+            if (!id.isNullOrBlank()) {
+                upgraded = "https://i.ytimg.com/vi/$id/hq720.jpg"
+            }
+        }
+
+        return upgraded
+    }
 
     private fun bestThumbnail(images: List<org.schabi.newpipe.extractor.Image>): String? =
         images
@@ -591,6 +692,7 @@ object MusicRepository {
                 image.width.coerceAtLeast(1) * image.height.coerceAtLeast(1)
             }
             ?.url
+            ?.let(::highQualityThumbnail)
 
     private fun youtubeThumbnail(url: String): String? {
         val id = Regex("(?:v=|youtu\\.be/|shorts/)([A-Za-z0-9_-]{11})")
@@ -599,7 +701,7 @@ object MusicRepository {
             ?.getOrNull(1)
             ?: return null
 
-        return "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg"
+        return "https://i.ytimg.com/vi/" + id + "/hq720.jpg"
     }
 
     private fun formatCount(value: Long): String =
