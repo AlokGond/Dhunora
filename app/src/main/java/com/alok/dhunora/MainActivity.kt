@@ -1,9 +1,13 @@
 package com.alok.dhunora
 
+import android.Manifest
 import android.app.DownloadManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.widget.Toast
@@ -122,21 +126,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import coil3.compose.AsyncImage
+import com.google.common.util.concurrent.ListenableFuture
 import com.alok.dhunora.account.AccountSession
 import com.alok.dhunora.account.LoginActivity
+import com.alok.dhunora.data.DownloadRecord
+import com.alok.dhunora.data.DownloadedSongStore
 import com.alok.dhunora.data.LocalPlaylistStore
 import com.alok.dhunora.data.MusicRepository
 import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
+import com.alok.dhunora.player.PlaybackService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -146,27 +156,46 @@ private enum class MainTab { HOME, LIBRARY, SEARCH }
 private enum class PlayerPane { UP_NEXT, LYRICS }
 
 class MainActivity : ComponentActivity() {
-    private lateinit var player: ExoPlayer
+    private lateinit var player: MediaController
+    private lateinit var controllerFuture: ListenableFuture<MediaController>
     private var sleepTimerJob: Job? = null
+    private var searchJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                8_000,
-                25_000,
-                500,
-                1_000
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                1001
             )
-            .build()
-        player = ExoPlayer.Builder(this)
-            .setLoadControl(loadControl)
-            .build()
-        setContent { DhunoraApp() }
+        }
+
+        lifecycleScope.launch {
+            controllerFuture =
+                MediaController.Builder(
+                    this@MainActivity,
+                    SessionToken(
+                        this@MainActivity,
+                        ComponentName(this@MainActivity, PlaybackService::class.java)
+                    )
+                ).buildAsync()
+
+            player = controllerFuture.await()
+            setContent { DhunoraApp() }
+        }
     }
 
     override fun onDestroy() {
-        player.release()
+        searchJob?.cancel()
+        sleepTimerJob?.cancel()
+        if (::controllerFuture.isInitialized) {
+            MediaController.releaseFuture(controllerFuture)
+        }
         super.onDestroy()
     }
 
@@ -198,8 +227,13 @@ class MainActivity : ComponentActivity() {
                     )
 
             val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            manager.enqueue(request)
-            Toast.makeText(this@MainActivity, "Download started", Toast.LENGTH_SHORT).show()
+            val downloadId = manager.enqueue(request)
+            DownloadedSongStore.add(this@MainActivity, downloadId, song)
+            Toast.makeText(
+                this@MainActivity,
+                "Download added to Dhunora",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -232,7 +266,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setPlayback(speed: Float, pitch: Float) {
-        player.playbackParameters = PlaybackParameters(speed, pitch)
+        player.setPlaybackParameters(PlaybackParameters(speed, pitch))
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
