@@ -44,7 +44,7 @@ object MusicRepository {
                     artist = item.uploaderName ?: "Unknown artist",
                     sourceUrl = item.url,
                     durationSeconds = item.duration.coerceAtLeast(0),
-                    thumbnailUrl = extractorThumb ?: youtubeThumbnail(item.url)
+                    thumbnailUrl = youtubeThumbnail(item.url) ?: extractorThumb
                 )
             }
             .distinctBy { it.sourceUrl }
@@ -67,7 +67,7 @@ object MusicRepository {
     }
 
     fun artworkFor(song: Song): String? {
-        return song.thumbnailUrl?.takeIf { it.isNotBlank() } ?: youtubeThumbnail(song.sourceUrl)
+        return youtubeThumbnail(song.sourceUrl) ?: song.thumbnailUrl?.takeIf { it.isNotBlank() }
     }
 
     private fun youtubeThumbnail(url: String): String? {
