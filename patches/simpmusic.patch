@@ -741,6 +741,142 @@ index 4216d91..cc040e2 100644
                  },
                  modifier =
                      Modifier
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
+index 57cd2fd..58b9406 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
+@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.collectLatest
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.update
+ import kotlinx.coroutines.launch
+-import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.Job
+ import org.jetbrains.compose.resources.StringResource
+ import simpmusic.composeapp.generated.resources.Res
+ import simpmusic.composeapp.generated.resources.albums
+@@ -112,12 +112,17 @@ class SearchViewModel(
+ 
+     private val requestedArtwork = mutableSetOf<String>()
+ 
++    private var searchJob: Job? = null
++    private var suggestionJob: Job? = null
++
+     var regionCode: String? = null
+     var language: String? = null
+ 
+     init {
+-        regionCode = runBlocking { dataStoreManager.location.first() }
+-        language = runBlocking { dataStoreManager.getString(SELECTED_LANGUAGE).first() }
++        viewModelScope.launch {
++            regionCode = dataStoreManager.location.first()
++            language = dataStoreManager.getString(SELECTED_LANGUAGE).first()
++        }
+         getSearchHistory()
+         getMoodAndGenres()
+     }
+@@ -188,8 +193,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchSongs(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataSong(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -210,8 +216,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchAll(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             var song = ArrayList<SongsResult>()
+             val video = ArrayList<VideosResult>()
+             var album = ArrayList<AlbumsResult>()
+@@ -337,7 +344,13 @@ class SearchViewModel(
+     }
+ 
+     fun suggestQuery(query: String) {
+-        viewModelScope.launch {
++        suggestionJob?.cancel()
++        if (query.isBlank()) {
++            _searchScreenState.update { it.copy(suggestQueries = emptyList(), suggestYTItems = emptyList()) }
++            return
++        }
++        suggestionJob = viewModelScope.launch {
++            delay(250)
+             searchRepository.getSuggestQuery(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -361,8 +374,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchAlbums(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataAlbum(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -386,8 +400,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchFeaturedPlaylist(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataFeaturedPlaylist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -411,8 +426,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchPodcast(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataPodcast(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -436,8 +452,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchArtists(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataArtist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -461,8 +478,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchPlaylists(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataPlaylist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -486,8 +504,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchVideos(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataVideo(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
 diff --git a/gradle/gradle-daemon-jvm.properties b/gradle/gradle-daemon-jvm.properties
 index 8918ccd..5a1672f 100644
 --- a/gradle/gradle-daemon-jvm.properties
