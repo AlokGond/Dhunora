@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, codex/simpmusic-parity]
+concurrency:
+  group: dhunora-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
