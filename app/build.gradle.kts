@@ -11,8 +11,8 @@ android {
         applicationId = "com.alok.dhunora"
         minSdk = 23
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.7.0"
     }
 
     compileOptions {
@@ -60,5 +60,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.10.2")
+    implementation("androidx.core:core-ktx:1.17.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
