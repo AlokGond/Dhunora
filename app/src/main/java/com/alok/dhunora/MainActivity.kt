@@ -325,6 +325,9 @@ class MainActivity : ComponentActivity() {
         var playerPane by rememberSaveable { mutableStateOf(PlayerPane.LYRICS) }
         var favorites by remember { mutableStateOf(loadFavorites()) }
         var recentSongs by remember { mutableStateOf(ListeningProfileStore.recent(this@MainActivity)) }
+        var searchSignals by remember {
+            mutableStateOf(ListeningProfileStore.recentSearches(this@MainActivity))
+        }
         var playbackQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
         var selectedMood by rememberSaveable { mutableStateOf("All") }
         var showSettings by remember { mutableStateOf(false) }
@@ -676,6 +679,13 @@ class MainActivity : ComponentActivity() {
         }
 
         fun openSearchResult(item: MusicSearchItem) {
+            val signal =
+                searchText.trim().takeIf { it.length >= 2 }
+                    ?: (item.title + " " + item.subtitle).trim()
+            ListeningProfileStore.recordSearch(this@MainActivity, signal)
+            searchSignals =
+                ListeningProfileStore.recentSearches(this@MainActivity)
+
             if (item.kind == SearchKind.SONG) {
                 val song = item.toSongOrNull() ?: return
                 startRecommendationRadio(song)
@@ -700,6 +710,21 @@ class MainActivity : ComponentActivity() {
             ) {
                 delay(240)
                 runSearch(searchText, selectedSearchKind)
+            }
+        }
+
+        LaunchedEffect(searchText, selectedTab) {
+            if (
+                selectedTab == MainTab.SEARCH &&
+                searchText.trim().length >= 3
+            ) {
+                delay(1400)
+                ListeningProfileStore.recordSearch(
+                    this@MainActivity,
+                    searchText.trim()
+                )
+                searchSignals =
+                    ListeningProfileStore.recentSearches(this@MainActivity)
             }
         }
 
@@ -746,12 +771,17 @@ class MainActivity : ComponentActivity() {
         }
 
         val homeProfileKey =
-            (
-                recentSongs.take(8) +
-                    favorites.take(6) +
-                    youtubeLikedSongs.take(6)
-            )
-                .joinToString("|") { it.sourceUrl }
+            buildString {
+                append(
+                    (
+                        recentSongs.take(10) +
+                            favorites.take(6) +
+                            youtubeLikedSongs.take(6)
+                    ).joinToString("|") { it.sourceUrl }
+                )
+                append("::")
+                append(searchSignals.take(8).joinToString("|"))
+            }
 
         LaunchedEffect(homeProfileKey, selectedMood, selectedTab) {
             if (selectedTab != MainTab.HOME) return@LaunchedEffect
@@ -763,7 +793,8 @@ class MainActivity : ComponentActivity() {
                         MusicRepository.personalizedHome(
                             recent = recentSongs,
                             favorites = favorites,
-                            accountLikes = youtubeLikedSongs
+                            accountLikes = youtubeLikedSongs,
+                            searchTerms = searchSignals
                         )
                     }.getOrDefault(emptyList())
                 } else {
@@ -2085,6 +2116,9 @@ private fun CollectionDetailScreen(
     onFavorite: (Song) -> Unit,
     favoriteCheck: (Song) -> Boolean
 ) {
+    CompositionLocalProvider(
+        LocalContentColor provides MaterialTheme.colorScheme.onBackground
+    ) {
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -2213,6 +2247,8 @@ private fun CollectionDetailScreen(
                 )
             }
         }
+    }
+
     }
 }
 
@@ -2641,6 +2677,9 @@ private fun LibraryCollectionScreen(
     onPlay: (Song) -> Unit,
     onFavorite: (Song) -> Unit
 ) {
+    CompositionLocalProvider(
+        LocalContentColor provides MaterialTheme.colorScheme.onBackground
+    ) {
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -2656,11 +2695,16 @@ private fun LibraryCollectionScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ArrowBack, "Back")
+                    Icon(
+                        Icons.Rounded.ArrowBack,
+                        "Back",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
                         collection.title,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
@@ -2725,7 +2769,11 @@ private fun LibraryCollectionScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("Nothing here yet", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Nothing here yet",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         } else {
@@ -2741,6 +2789,8 @@ private fun LibraryCollectionScreen(
                 )
             }
         }
+    }
+
     }
 }
 
@@ -3580,7 +3630,13 @@ private fun SongListRow(song: Song, favorite: Boolean, onPlay: () -> Unit, onFav
         Artwork(song, Modifier.size(58.dp), 10.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                song.title,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Spacer(Modifier.height(2.dp))
             Text(
                 buildString {
@@ -3594,7 +3650,13 @@ private fun SongListRow(song: Song, favorite: Boolean, onPlay: () -> Unit, onFav
             )
         }
         IconButton(onClick = onFavorite) {
-            Icon(if (favorite) Icons.Rounded.Favorite else Icons.Rounded.MoreVert, null)
+            Icon(
+                if (favorite) Icons.Rounded.Favorite else Icons.Rounded.MoreVert,
+                null,
+                tint =
+                    if (favorite) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
