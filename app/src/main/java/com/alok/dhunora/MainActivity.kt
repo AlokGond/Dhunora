@@ -143,6 +143,7 @@ import androidx.media3.session.SessionToken
 import coil3.compose.AsyncImage
 import com.google.common.util.concurrent.ListenableFuture
 import com.alok.dhunora.account.AccountSession
+import com.alok.dhunora.account.AccountProfileRepository
 import com.alok.dhunora.account.LoginActivity
 import com.alok.dhunora.data.DownloadRecord
 import com.alok.dhunora.data.DownloadedSongStore
@@ -317,6 +318,12 @@ class MainActivity : ComponentActivity() {
         var showSongMenu by remember { mutableStateOf(false) }
         var showAccountSheet by remember { mutableStateOf(false) }
         var youtubeLoggedIn by remember { mutableStateOf(AccountSession.isLoggedIn(this@MainActivity)) }
+        var profileName by remember {
+            mutableStateOf(AccountSession.profileName(this@MainActivity))
+        }
+        var profileAvatar by remember {
+            mutableStateOf(AccountSession.profileAvatar(this@MainActivity))
+        }
         var youtubeLikedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
         var youtubeLikedLoading by remember { mutableStateOf(false) }
         var downloads by remember {
@@ -360,6 +367,15 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.StartActivityForResult()
             ) {
                 youtubeLoggedIn = AccountSession.isLoggedIn(this@MainActivity)
+                profileName = AccountSession.profileName(this@MainActivity)
+                profileAvatar = AccountSession.profileAvatar(this@MainActivity)
+                if (youtubeLoggedIn) {
+                    lifecycleScope.launch {
+                        AccountProfileRepository.refresh(this@MainActivity)
+                        profileName = AccountSession.profileName(this@MainActivity)
+                        profileAvatar = AccountSession.profileAvatar(this@MainActivity)
+                    }
+                }
             }
 
         fun openAccount() {
@@ -657,6 +673,11 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(youtubeLoggedIn) {
             if (youtubeLoggedIn) {
+                runCatching {
+                    AccountProfileRepository.refresh(this@MainActivity)
+                }
+                profileName = AccountSession.profileName(this@MainActivity)
+                profileAvatar = AccountSession.profileAvatar(this@MainActivity)
                 youtubeLikedLoading = true
                 youtubeLikedSongs =
                     runCatching { MusicRepository.loadYouTubeLikedMusic() }
@@ -924,6 +945,8 @@ class MainActivity : ComponentActivity() {
                                 onFavorite = { toggleFavorite(it) },
                                 favoriteCheck = { isFavorite(it) },
                                 youtubeLoggedIn = youtubeLoggedIn,
+                                profileName = profileName,
+                                profileAvatar = profileAvatar,
                                 onAccount = { openAccount() },
                                 onSearch = { selectedTab = MainTab.SEARCH },
                                 onHistory = { selectedTab = MainTab.LIBRARY },
@@ -1078,6 +1101,8 @@ class MainActivity : ComponentActivity() {
                         containerColor = MaterialTheme.colorScheme.surface
                     ) {
                         AccountSheet(
+                            profileName = profileName,
+                            profileAvatar = profileAvatar,
                             likedCount = youtubeLikedSongs.size,
                             onOpenLiked = {
                                 showAccountSheet = false
@@ -1086,6 +1111,8 @@ class MainActivity : ComponentActivity() {
                             onLogout = {
                                 AccountSession.clear(this@MainActivity)
                                 youtubeLoggedIn = false
+                                profileName = ""
+                                profileAvatar = ""
                                 youtubeLikedSongs = emptyList()
                                 showAccountSheet = false
                                 Toast.makeText(this@MainActivity, "Signed out", Toast.LENGTH_SHORT).show()
