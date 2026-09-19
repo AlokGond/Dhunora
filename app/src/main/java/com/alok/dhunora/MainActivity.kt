@@ -69,6 +69,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -78,6 +79,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -106,7 +108,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
 import com.alok.dhunora.data.MusicRepository
 import com.alok.dhunora.model.Song
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -149,6 +150,7 @@ class MainActivity : ComponentActivity() {
         var playerPane by rememberSaveable { mutableStateOf(PlayerPane.UP_NEXT) }
         var favorites by remember { mutableStateOf(loadFavorites()) }
         var recentSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var playbackQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
         var selectedMood by rememberSaveable { mutableStateOf("All") }
         var showSettings by remember { mutableStateOf(false) }
         var positionMs by remember { mutableLongStateOf(0L) }
@@ -174,11 +176,22 @@ class MainActivity : ComponentActivity() {
             saveFavorites(favorites)
         }
 
-        fun playSong(song: Song) {
+        fun playSong(song: Song, queue: List<Song>? = null) {
+            val fallbackQueue = (searchResults + quickPicks + madeForYou + trending + favorites)
+                .distinctBy { it.sourceUrl }
+
+            playbackQueue =
+                when {
+                    !queue.isNullOrEmpty() -> queue.distinctBy { it.sourceUrl }
+                    playbackQueue.any { it.sourceUrl == song.sourceUrl } -> playbackQueue
+                    else -> (listOf(song) + fallbackQueue).distinctBy { it.sourceUrl }
+                }
+
             currentSong = song
             recentSongs = listOf(song) + recentSongs.filterNot { it.sourceUrl == song.sourceUrl }.take(19)
             buffering = true
             error = null
+
             lifecycleScope.launch {
                 runCatching {
                     val url = MusicRepository.resolveAudioUrl(song)
@@ -193,6 +206,32 @@ class MainActivity : ComponentActivity() {
                 }
                 buffering = false
             }
+        }
+
+        fun playNext() {
+            val queue = playbackQueue.ifEmpty {
+                (searchResults + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
+            }
+            if (queue.isEmpty()) return
+
+            val currentIndex = currentSong?.let { active ->
+                queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
+            } ?: -1
+            val nextIndex = if (currentIndex < 0) 0 else (currentIndex + 1) % queue.size
+            playSong(queue[nextIndex], queue)
+        }
+
+        fun playPrevious() {
+            val queue = playbackQueue.ifEmpty {
+                (searchResults + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
+            }
+            if (queue.isEmpty()) return
+
+            val currentIndex = currentSong?.let { active ->
+                queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
+            } ?: 0
+            val previousIndex = if (currentIndex <= 0) queue.lastIndex else currentIndex - 1
+            playSong(queue[previousIndex], queue)
         }
 
         fun runSearch(term: String = searchText) {
@@ -211,12 +250,13 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             loadingHome = true
-            val a = async { runCatching { MusicRepository.searchSongs("Top hits India 2026") }.getOrDefault(emptyList()) }
-            val b = async { runCatching { MusicRepository.searchSongs("Bollywood hits 2026") }.getOrDefault(emptyList()) }
-            val c = async { runCatching { MusicRepository.searchSongs("Punjabi hits 2026") }.getOrDefault(emptyList()) }
-            quickPicks = a.await().take(12)
-            madeForYou = b.await().take(10)
-            trending = c.await().take(10)
+            val songs = runCatching {
+                MusicRepository.searchSongs("Top hits India Bollywood Punjabi 2026")
+            }.getOrDefault(emptyList())
+
+            quickPicks = songs.take(12)
+            madeForYou = songs.drop(3).take(10)
+            trending = songs.reversed().take(10)
             loadingHome = false
         }
 
@@ -232,12 +272,12 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(currentSong, isPlaying) {
+        LaunchedEffect(currentSong) {
             while (currentSong != null) {
                 positionMs = player.currentPosition.coerceAtLeast(0L)
                 durationMs = player.duration.takeIf { it > 0 } ?: 1L
                 isPlaying = player.isPlaying
-                delay(500)
+                delay(1000)
             }
         }
 
@@ -268,6 +308,8 @@ class MainActivity : ComponentActivity() {
                             player.seekTo((durationMs * fraction.coerceIn(0f, 1f)).toLong())
                         },
                         onFavorite = { toggleFavorite(currentSong!!) },
+                        onPrevious = { playPrevious() },
+                        onNext = { playNext() },
                         onPane = { playerPane = it },
                         onPlaySong = { playSong(it) }
                     )
@@ -286,7 +328,8 @@ class MainActivity : ComponentActivity() {
                                 onTogglePlay = {
                                     if (player.isPlaying) player.pause() else player.play()
                                     isPlaying = player.isPlaying
-                                }
+                                },
+                                onNext = { playNext() }
                             )
                         }
                     ) { padding ->
@@ -774,7 +817,8 @@ private fun PlayerAndNavigation(
     progress: Float,
     onSelect: (MainTab) -> Unit,
     onOpenPlayer: () -> Unit,
-    onTogglePlay: () -> Unit
+    onTogglePlay: () -> Unit,
+    onNext: () -> Unit
 ) {
     Column(
         Modifier
@@ -803,7 +847,7 @@ private fun PlayerAndNavigation(
                         Modifier.fillMaxWidth().weight(1f).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Artwork(currentSong.thumbnailUrl, Modifier.size(50.dp), 12.dp)
+                        Artwork(currentSong, Modifier.size(50.dp), 12.dp)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(currentSong.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -813,7 +857,7 @@ private fun PlayerAndNavigation(
                             if (buffering) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                             else Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
                         }
-                        IconButton(onClick = {}) { Icon(Icons.Rounded.SkipNext, null) }
+                        IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, "Next") }
                     }
                     LinearProgressIndicator(
                         progress = { progress },
@@ -917,6 +961,8 @@ private fun NowPlayingScreen(
     onTogglePlay: () -> Unit,
     onSeek: (Float) -> Unit,
     onFavorite: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onPane: (PlayerPane) -> Unit,
     onPlaySong: (Song) -> Unit
 ) {
@@ -924,7 +970,8 @@ private fun NowPlayingScreen(
     var dragging by remember { mutableFloatStateOf(fraction) }
     LaunchedEffect(fraction) { dragging = fraction }
 
-    LazyColumn(
+    CompositionLocalProvider(LocalContentColor provides Color.White) {
+        LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -992,7 +1039,7 @@ private fun NowPlayingScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {}) { Icon(Icons.Rounded.Shuffle, null) }
-                    IconButton(onClick = {}) { Icon(Icons.Rounded.SkipPrevious, null, modifier = Modifier.size(36.dp)) }
+                    IconButton(onClick = onPrevious) { Icon(Icons.Rounded.SkipPrevious, "Previous", modifier = Modifier.size(36.dp)) }
                     FilledIconButton(
                         onClick = onTogglePlay,
                         modifier = Modifier.size(72.dp)
@@ -1000,7 +1047,7 @@ private fun NowPlayingScreen(
                         if (buffering) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = MaterialTheme.colorScheme.onPrimary)
                         else Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(38.dp))
                     }
-                    IconButton(onClick = {}) { Icon(Icons.Rounded.SkipNext, null, modifier = Modifier.size(36.dp)) }
+                    IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, "Next", modifier = Modifier.size(36.dp)) }
                     IconButton(onClick = {}) { Icon(Icons.Rounded.Repeat, null) }
                 }
 
@@ -1044,6 +1091,7 @@ private fun NowPlayingScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -1077,7 +1125,7 @@ private fun CompactSongRow(song: Song, favorite: Boolean, onPlay: () -> Unit, on
             Modifier.fillMaxSize().padding(7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Artwork(song.thumbnailUrl, Modifier.size(56.dp), 10.dp)
+            Artwork(song, Modifier.size(56.dp), 10.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1093,7 +1141,7 @@ private fun CompactSongRow(song: Song, favorite: Boolean, onPlay: () -> Unit, on
 @Composable
 private fun SquareSongCard(song: Song, onClick: () -> Unit) {
     Column(Modifier.width(156.dp).clickable(onClick = onClick)) {
-        Artwork(song.thumbnailUrl, Modifier.size(156.dp), 18.dp)
+        Artwork(song, Modifier.size(156.dp), 18.dp)
         Spacer(Modifier.height(8.dp))
         Text(song.title, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
         Text(song.artist, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1106,7 +1154,7 @@ private fun SongListRow(song: Song, favorite: Boolean, onPlay: () -> Unit, onFav
         Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Artwork(song.thumbnailUrl, Modifier.size(58.dp), 10.dp)
+        Artwork(song, Modifier.size(58.dp), 10.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(song.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1129,18 +1177,51 @@ private fun SongListRow(song: Song, favorite: Boolean, onPlay: () -> Unit, onFav
 }
 
 @Composable
-private fun Artwork(url: String?, modifier: Modifier, radius: Dp) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(radius), color = MaterialTheme.colorScheme.surfaceVariant) {
-        if (!url.isNullOrBlank()) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(34.dp))
+private fun Artwork(song: Song, modifier: Modifier, radius: Dp) {
+    val url = MusicRepository.artworkFor(song)
+    var failed by remember(url) { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(radius),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF34264A), Color(0xFF18151F))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!url.isNullOrBlank() && !failed) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = song.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    onError = { failed = true }
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Rounded.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(42.dp)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        song.title,
+                        color = Color.White.copy(alpha = 0.78f),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
             }
         }
     }
