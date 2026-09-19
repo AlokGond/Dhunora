@@ -4,9 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -45,8 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 class SpotifyLoginActivity : ComponentActivity() {
     companion object {
         private const val SPOTIFY_LOGIN_URL =
-            "https://accounts.spotify.com/login" +
-                "?continue=https%3A%2F%2Faccounts.spotify.com%2Fen%2Fstatus"
+            "https://accounts.spotify.com/en/login"
     }
 
 
@@ -104,18 +100,11 @@ class SpotifyLoginActivity : ComponentActivity() {
                             factory = { context ->
                                 WebView(context).apply {
                                     webViewRef = this
-                                    setBackgroundColor(android.graphics.Color.BLACK)
+                                    setBackgroundColor(android.graphics.Color.WHITE)
                                     cookieManager.setAcceptThirdPartyCookies(this, true)
 
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
-                                    settings.databaseEnabled = true
-                                    settings.loadsImagesAutomatically = true
-                                    settings.javaScriptCanOpenWindowsAutomatically = true
-                                    settings.setSupportMultipleWindows(false)
-                                    settings.cacheMode = WebSettings.LOAD_DEFAULT
-                                    settings.mixedContentMode =
-                                        WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
                                     webChromeClient =
                                         object : WebChromeClient() {
@@ -124,35 +113,27 @@ class SpotifyLoginActivity : ComponentActivity() {
                                                 newProgress: Int
                                             ) {
                                                 progress = newProgress / 100f
-                                                if (newProgress > 5) loadError = null
                                             }
                                         }
 
                                     webViewClient =
                                         object : WebViewClient() {
-                                            override fun shouldOverrideUrlLoading(
-                                                view: WebView?,
-                                                request: WebResourceRequest?
-                                            ): Boolean {
-                                                val target = request?.url?.toString().orEmpty()
-                                                if (target.startsWith("https://")) {
-                                                    view?.loadUrl(target)
-                                                    return true
-                                                }
-                                                return false
-                                            }
-
+                                            @Deprecated("Deprecated in Java")
                                             override fun onReceivedError(
                                                 view: WebView?,
-                                                request: WebResourceRequest?,
-                                                error: WebResourceError?
+                                                errorCode: Int,
+                                                description: String?,
+                                                failingUrl: String?
                                             ) {
-                                                super.onReceivedError(view, request, error)
-                                                if (request?.isForMainFrame == true) {
-                                                    loadError =
-                                                        error?.description?.toString()
-                                                            ?: "Spotify login page could not load"
-                                                }
+                                                super.onReceivedError(
+                                                    view,
+                                                    errorCode,
+                                                    description,
+                                                    failingUrl
+                                                )
+                                                loadError =
+                                                    description
+                                                        ?: "Spotify login page could not load"
                                             }
 
                                             override fun onPageFinished(
@@ -161,52 +142,47 @@ class SpotifyLoginActivity : ComponentActivity() {
                                             ) {
                                                 super.onPageFinished(view, url)
                                                 progress = 1f
+                                                loadError = null
                                                 CookieManager.getInstance().flush()
 
+                                                val currentUrl = url.orEmpty()
                                                 val cookie =
                                                     CookieManager.getInstance()
-                                                        .getCookie(
-                                                            url
-                                                                ?: "https://accounts.spotify.com"
-                                                        )
-                                                        .orEmpty() +
-                                                        "; " +
-                                                        CookieManager.getInstance()
-                                                            .getCookie(
-                                                                "https://accounts.spotify.com"
-                                                            )
-                                                            .orEmpty()
-
-                                                val spDc =
-                                                    cookie
-                                                        .split(';')
-                                                        .asSequence()
-                                                        .map { it.trim() }
-                                                        .firstOrNull {
-                                                            it.startsWith("sp_dc=")
-                                                        }
-                                                        ?.substringAfter('=')
+                                                        .getCookie(currentUrl)
                                                         .orEmpty()
 
                                                 val isStatusPage =
-                                                    url?.matches(
+                                                    currentUrl.matches(
                                                         Regex(
                                                             "^https://accounts\\.spotify\\.com/" +
                                                                 "(?:[^/]+/)?status(?:\\?.*)?$"
                                                         )
-                                                    ) == true
-
-                                                if (spDc.isNotBlank() && isStatusPage) {
-                                                    SpotifySession.saveSpDc(
-                                                        this@SpotifyLoginActivity,
-                                                        spDc
                                                     )
-                                                    Toast.makeText(
-                                                        this@SpotifyLoginActivity,
-                                                        "Spotify connected",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                    finish()
+
+                                                if (isStatusPage && cookie.isNotBlank()) {
+                                                    val spDc =
+                                                        cookie
+                                                            .split(';')
+                                                            .asSequence()
+                                                            .map { it.trim() }
+                                                            .firstOrNull {
+                                                                it.startsWith("sp_dc=")
+                                                            }
+                                                            ?.substringAfter('=')
+                                                            .orEmpty()
+
+                                                    if (spDc.isNotBlank()) {
+                                                        SpotifySession.saveSpDc(
+                                                            this@SpotifyLoginActivity,
+                                                            spDc
+                                                        )
+                                                        Toast.makeText(
+                                                            this@SpotifyLoginActivity,
+                                                            "Spotify connected",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        finish()
+                                                    }
                                                 }
                                             }
                                         }
@@ -226,12 +202,6 @@ class SpotifyLoginActivity : ComponentActivity() {
                                 Text(
                                     "Spotify login could not load",
                                     color = Color.White,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    loadError.orEmpty(),
-                                    color = Color.White.copy(alpha = 0.65f),
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(Modifier.height(16.dp))
