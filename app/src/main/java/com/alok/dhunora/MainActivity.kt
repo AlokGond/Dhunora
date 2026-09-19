@@ -998,7 +998,7 @@ private fun NowPlayingScreen(
             }
 
             Artwork(
-                song.thumbnailUrl,
+                song,
                 Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp).aspectRatio(1f),
                 24.dp
             )
