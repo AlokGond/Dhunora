@@ -810,8 +810,11 @@ class MainActivity : ComponentActivity() {
                         onNext = { playNext() },
                         onPane = { playerPane = it },
                         onPlaySong = { playSong(it) },
+                        onAdd = { addToMyPlaylist(currentSong!!) },
+                        onRadio = { startRecommendationRadio(currentSong!!) },
                         style = nowPlayingStyle,
-                        liquidGlass = liquidGlass
+                        liquidGlass = liquidGlass,
+                        romanizedLyrics = romanizedLyrics
                     )
                 } else if (openedSearchItem != null) {
                     CollectionDetailScreen(
@@ -2849,135 +2852,427 @@ private fun NowPlayingScreen(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onPane: (PlayerPane) -> Unit,
-    onPlaySong: (Song) -> Unit
+    onPlaySong: (Song) -> Unit,
+    onAdd: () -> Unit,
+    onRadio: () -> Unit,
+    style: String,
+    liquidGlass: Boolean,
+    romanizedLyrics: Boolean
 ) {
-    val fraction = (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    val fraction =
+        (positionMs.toFloat() / durationMs.toFloat())
+            .coerceIn(0f, 1f)
     var dragging by remember { mutableFloatStateOf(fraction) }
     LaunchedEffect(fraction) { dragging = fraction }
 
+    val topColor =
+        if (style == "Immersive") Color(0xFF4A1730)
+        else Color(0xFF3D1735)
+    val midColor =
+        if (liquidGlass) Color(0xFF231316)
+        else Color(0xFF171116)
+
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF3A285E), Color(0xFF15101E), Color(0xFF09090B)),
-                    startY = 0f,
-                    endY = 1500f
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            topColor,
+                            midColor,
+                            Color(0xFF09090B),
+                            Color(0xFF09090B)
+                        ),
+                        startY = 0f,
+                        endY = 1750f
+                    )
                 )
-            )
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onCollapse) { Icon(Icons.Rounded.KeyboardArrowDown, "Collapse") }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NOW PLAYING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(song.artist, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                }
-                IconButton(onClick = onMore) {
-                    Icon(Icons.Rounded.MoreVert, "More")
-                }
-            }
-
-            Artwork(
-                song,
-                Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp).aspectRatio(1f),
-                24.dp
-            )
-
-            Column(Modifier.padding(horizontal = 26.dp)) {
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(song.title, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.height(5.dp))
-                        Text(song.artist, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    }
-                    IconButton(onClick = onFavorite) {
-                        Icon(
-                            if (favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            null,
-                            tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(18.dp))
-                Slider(
-                    value = dragging,
-                    onValueChange = { dragging = it },
-                    onValueChangeFinished = { onSeek(dragging) },
-                    valueRange = 0f..1f
-                )
-                Row(Modifier.fillMaxWidth()) {
-                    Text(formatTime(positionMs), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.weight(1f))
-                    Text(formatTime(durationMs), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(bottom = 36.dp)
+        ) {
+            item {
                 Row(
-                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = {}) { Icon(Icons.Rounded.Shuffle, null) }
-                    IconButton(onClick = onPrevious) { Icon(Icons.Rounded.SkipPrevious, "Previous", modifier = Modifier.size(36.dp)) }
-                    FilledIconButton(
-                        onClick = onTogglePlay,
-                        modifier = Modifier.size(72.dp)
-                    ) {
-                        if (buffering) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        else Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, modifier = Modifier.size(38.dp))
+                    IconButton(onClick = onCollapse) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, "Collapse")
                     }
-                    IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, "Next", modifier = Modifier.size(36.dp)) }
-                    IconButton(onClick = {}) { Icon(Icons.Rounded.Repeat, null) }
-                }
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    PlayerPaneButton("UP NEXT", Icons.Rounded.QueueMusic, pane == PlayerPane.UP_NEXT) { onPane(PlayerPane.UP_NEXT) }
-                    PlayerPaneButton("LYRICS", Icons.Rounded.MusicNote, pane == PlayerPane.LYRICS) { onPane(PlayerPane.LYRICS) }
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-        }
-
-        if (pane == PlayerPane.UP_NEXT) {
-            item {
-                Text("Up next", Modifier.padding(horizontal = 22.dp, vertical = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            items(queue.filterNot { it.sourceUrl == song.sourceUrl }.take(8)) {
-                SongListRow(it, false, { onPlaySong(it) }, {})
-            }
-        } else {
-            item {
-                Card(
-                    Modifier.fillMaxWidth().padding(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Column(Modifier.padding(24.dp)) {
-                        Text("Lyrics", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                        Spacer(Modifier.height(12.dp))
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            "Synced lyrics will appear here when a lyrics provider is connected.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 26.sp,
-                            fontSize = 17.sp
+                            "NOW PLAYING",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                        Text(
+                            song.title,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    IconButton(onClick = onMore) {
+                        Icon(Icons.Rounded.MoreVert, "More")
+                    }
+                }
+
+                Spacer(Modifier.height(22.dp))
+
+                Artwork(
+                    song,
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 26.dp)
+                        .aspectRatio(1f),
+                    12.dp
+                )
+
+                Spacer(Modifier.height(44.dp))
+
+                Column(Modifier.padding(horizontal = 24.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                song.title,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 27.sp
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                song.artist,
+                                fontSize = 15.sp,
+                                color = Color.White.copy(alpha = 0.68f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        IconButton(onClick = onAdd) {
+                            Surface(
+                                Modifier.size(36.dp),
+                                shape = CircleShape,
+                                color = Color.Transparent,
+                                border = BorderStroke(
+                                    2.dp,
+                                    Color.White.copy(alpha = 0.88f)
+                                )
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Rounded.Add,
+                                        "Add",
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        IconButton(onClick = onFavorite) {
+                            Icon(
+                                if (favorite)
+                                    Icons.Rounded.Favorite
+                                else
+                                    Icons.Rounded.FavoriteBorder,
+                                null,
+                                modifier = Modifier.size(31.dp),
+                                tint =
+                                    if (favorite)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Slider(
+                        value = dragging,
+                        onValueChange = { dragging = it },
+                        onValueChangeFinished = { onSeek(dragging) },
+                        valueRange = 0f..1f
+                    )
+
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(
+                            formatTime(positionMs),
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            formatTime(durationMs),
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
+
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 22.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {}) {
+                            Icon(
+                                Icons.Rounded.Shuffle,
+                                null,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        IconButton(onClick = onPrevious) {
+                            Icon(
+                                Icons.Rounded.SkipPrevious,
+                                "Previous",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+
+                        FilledIconButton(
+                            onClick = onTogglePlay,
+                            modifier = Modifier.size(82.dp),
+                            colors =
+                                androidx.compose.material3.IconButtonDefaults
+                                    .filledIconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black
+                                    )
+                        ) {
+                            if (buffering) {
+                                CircularProgressIndicator(
+                                    Modifier.size(30.dp),
+                                    strokeWidth = 3.dp,
+                                    color = Color.Black
+                                )
+                            } else {
+                                Icon(
+                                    if (isPlaying)
+                                        Icons.Rounded.Pause
+                                    else
+                                        Icons.Rounded.PlayArrow,
+                                    null,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = onNext) {
+                            Icon(
+                                Icons.Rounded.SkipNext,
+                                "Next",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+
+                        IconButton(onClick = {}) {
+                            Icon(
+                                Icons.Rounded.Repeat,
+                                null,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        PlayerActionIcon(
+                            icon = Icons.Rounded.Info,
+                            label = "Info",
+                            onClick = onMore
+                        )
+                        PlayerActionIcon(
+                            icon = Icons.Rounded.Radio,
+                            label = "Radio",
+                            onClick = onRadio
+                        )
+                        PlayerActionIcon(
+                            icon = Icons.Rounded.PlaylistAdd,
+                            label = "Queue",
+                            onClick = { onPane(PlayerPane.UP_NEXT) }
+                        )
+                        PlayerActionIcon(
+                            icon = Icons.Rounded.QueueMusic,
+                            label = "Lyrics",
+                            onClick = { onPane(PlayerPane.LYRICS) }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(26.dp))
+
+                if (pane == PlayerPane.LYRICS) {
+                    LyricsPreviewCard(
+                        romanized = romanizedLyrics,
+                        onShowQueue = { onPane(PlayerPane.UP_NEXT) }
+                    )
+                } else {
+                    UpNextPreview(
+                        current = song,
+                        queue = queue,
+                        onPlaySong = onPlaySong,
+                        onShowLyrics = { onPane(PlayerPane.LYRICS) }
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PlayerActionIcon(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(72.dp)
+            .clickable(onClick = onClick)
+            .padding(vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            modifier = Modifier.size(27.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.65f)
+        )
+    }
+}
+
+@Composable
+private fun LyricsPreviewCard(
+    romanized: Boolean,
+    onShowQueue: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFCB1D42)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(22.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Lyrics",
+                    color = Color.White,
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "Queue",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable(onClick = onShowQueue)
+                        .padding(8.dp)
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Text(
+                if (romanized)
+                    "Line-synced lyrics will appear here in your selected script."
+                else
+                    "Line-synced lyrics will appear here when available.",
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = 19.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 31.sp
+            )
+
+            Spacer(Modifier.height(42.dp))
+
+            Text(
+                "Lyrics",
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.End)
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpNextPreview(
+    current: Song,
+    queue: List<Song>,
+    onPlaySong: (Song) -> Unit,
+    onShowLyrics: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.06f)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(vertical = 12.dp)) {
+            Row(
+                Modifier.padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Up next",
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "Lyrics",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable(onClick = onShowLyrics)
+                        .padding(8.dp)
+                )
+            }
+
+            queue
+                .filterNot { it.sourceUrl == current.sourceUrl }
+                .take(4)
+                .forEach { next ->
+                    SongListRow(
+                        song = next,
+                        favorite = false,
+                        onPlay = { onPlaySong(next) },
+                        onFavorite = {}
+                    )
+                }
+        }
     }
 }
 
