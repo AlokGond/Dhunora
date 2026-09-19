@@ -107,6 +107,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
 import com.alok.dhunora.data.MusicRepository
+import com.alok.dhunora.model.MusicSearchItem
+import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -136,7 +138,11 @@ class MainActivity : ComponentActivity() {
     private fun DhunoraApp() {
         var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
         var searchText by rememberSaveable { mutableStateOf("") }
-        var searchResults by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var searchResults by remember { mutableStateOf<List<MusicSearchItem>>(emptyList()) }
+        var selectedSearchKind by rememberSaveable { mutableStateOf(SearchKind.SONG) }
+        var openedSearchItem by remember { mutableStateOf<MusicSearchItem?>(null) }
+        var openedSearchSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var loadingSearchDetail by remember { mutableStateOf(false) }
         var quickPicks by remember { mutableStateOf<List<Song>>(emptyList()) }
         var madeForYou by remember { mutableStateOf<List<Song>>(emptyList()) }
         var trending by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -177,7 +183,7 @@ class MainActivity : ComponentActivity() {
         }
 
         fun playSong(song: Song, queue: List<Song>? = null) {
-            val fallbackQueue = (searchResults + quickPicks + madeForYou + trending + favorites)
+            val fallbackQueue = (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites)
                 .distinctBy { it.sourceUrl }
 
             playbackQueue =
@@ -210,7 +216,7 @@ class MainActivity : ComponentActivity() {
 
         fun playNext() {
             val queue = playbackQueue.ifEmpty {
-                (searchResults + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
+                (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
             }
             if (queue.isEmpty()) return
 
@@ -223,7 +229,7 @@ class MainActivity : ComponentActivity() {
 
         fun playPrevious() {
             val queue = playbackQueue.ifEmpty {
-                (searchResults + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
+                (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
             }
             if (queue.isEmpty()) return
 
@@ -234,17 +240,37 @@ class MainActivity : ComponentActivity() {
             playSong(queue[previousIndex], queue)
         }
 
-        fun runSearch(term: String = searchText) {
+        fun runSearch(term: String = searchText, kind: SearchKind = selectedSearchKind) {
             if (term.isBlank()) return
             searchText = term
+            selectedSearchKind = kind
             selectedTab = MainTab.SEARCH
             loadingSearch = true
             error = null
             lifecycleScope.launch {
-                runCatching { MusicRepository.searchSongs(term.trim()) }
+                runCatching { MusicRepository.search(term.trim(), kind) }
                     .onSuccess { searchResults = it }
                     .onFailure { error = it.message ?: "Search failed" }
                 loadingSearch = false
+            }
+        }
+
+        fun openSearchResult(item: MusicSearchItem) {
+            if (item.kind == SearchKind.SONG) {
+                val song = item.toSongOrNull() ?: return
+                val queue = searchResults.mapNotNull { it.toSongOrNull() }
+                playSong(song, queue)
+                return
+            }
+
+            openedSearchItem = item
+            openedSearchSongs = emptyList()
+            loadingSearchDetail = true
+            lifecycleScope.launch {
+                runCatching { MusicRepository.loadCollection(item) }
+                    .onSuccess { openedSearchSongs = it }
+                    .onFailure { error = it.message ?: "Could not load " + item.kind.label.lowercase() }
+                loadingSearchDetail = false
             }
         }
 
@@ -282,6 +308,10 @@ class MainActivity : ComponentActivity() {
         }
 
         BackHandler(enabled = playerExpanded) { playerExpanded = false }
+        BackHandler(enabled = !playerExpanded && openedSearchItem != null) {
+            openedSearchItem = null
+            openedSearchSongs = emptyList()
+        }
 
         MaterialTheme(colorScheme = colors) {
             Box(
@@ -312,6 +342,26 @@ class MainActivity : ComponentActivity() {
                         onNext = { playNext() },
                         onPane = { playerPane = it },
                         onPlaySong = { playSong(it) }
+                    )
+                } else if (openedSearchItem != null) {
+                    CollectionDetailScreen(
+                        item = openedSearchItem!!,
+                        songs = openedSearchSongs,
+                        loading = loadingSearchDetail,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                        onBack = {
+                            openedSearchItem = null
+                            openedSearchSongs = emptyList()
+                        },
+                        onPlayAll = {
+                            openedSearchSongs.firstOrNull()?.let { first ->
+                                playSong(first, openedSearchSongs)
+                            }
+                        },
+                        onPlaySong = { song -> playSong(song, openedSearchSongs) },
+                        onFavorite = { toggleFavorite(it) },
+                        favoriteCheck = { isFavorite(it) }
                     )
                 } else {
                     Scaffold(
@@ -353,13 +403,18 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(padding),
                                 text = searchText,
                                 results = searchResults,
+                                selectedKind = selectedSearchKind,
                                 loading = loadingSearch,
                                 error = error,
                                 onText = { searchText = it },
-                                onSubmit = { runSearch(it) },
-                                onPlay = { playSong(it) },
-                                onFavorite = { toggleFavorite(it) },
-                                favoriteCheck = { isFavorite(it) }
+                                onSubmit = { query, kind -> runSearch(query, kind) },
+                                onKindChange = { kind ->
+                                    selectedSearchKind = kind
+                                    if (searchText.isNotBlank()) runSearch(searchText, kind)
+                                },
+                                onOpen = { openSearchResult(it) },
+                                onFavorite = { song -> toggleFavorite(song) },
+                                favoriteCheck = { song -> isFavorite(song) }
                             )
                             MainTab.LIBRARY -> LibraryScreen(
                                 modifier = Modifier.padding(padding),
