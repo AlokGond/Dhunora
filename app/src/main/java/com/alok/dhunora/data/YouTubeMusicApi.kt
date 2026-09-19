@@ -126,8 +126,8 @@ object YouTubeMusicApi {
 
         val thumb =
             findThumbnailUrl(renderer)
-                ?.replace("w60-h60", "w544-h544")
-                ?.replace("w120-h120", "w544-h544")
+                ?.replace(Regex("w\\d+-h\\d+"), "w800-h800")
+                ?.replace(Regex("=s\\d+(-c)?"), "=s800-c")
 
         return MusicSearchItem(
             kind = SearchKind.SONG,
