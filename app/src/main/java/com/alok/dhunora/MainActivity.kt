@@ -166,6 +166,8 @@ import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
 import com.alok.dhunora.player.PlaybackService
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -309,6 +311,8 @@ class MainActivity : ComponentActivity() {
         var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
         var searchText by rememberSaveable { mutableStateOf("") }
         var searchResults by remember { mutableStateOf<List<MusicSearchItem>>(emptyList()) }
+        var liveSearchResults by remember { mutableStateOf<List<MusicSearchItem>>(emptyList()) }
+        var searchCommitted by rememberSaveable { mutableStateOf(false) }
         var selectedSearchKind by rememberSaveable { mutableStateOf(SearchKind.SONG) }
         var openedSearchItem by remember { mutableStateOf<MusicSearchItem?>(null) }
         var openedSearchSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -658,6 +662,7 @@ class MainActivity : ComponentActivity() {
             searchText = term
             selectedSearchKind = kind
             selectedTab = MainTab.SEARCH
+            searchCommitted = true
             error = null
 
             searchRequestId += 1L
@@ -734,13 +739,72 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(searchText, selectedSearchKind, selectedTab) {
+        LaunchedEffect(searchText, selectedTab, searchCommitted) {
+            val clean = searchText.trim()
+
             if (
-                selectedTab == MainTab.SEARCH &&
-                searchText.trim().length >= 2
+                selectedTab != MainTab.SEARCH ||
+                searchCommitted ||
+                clean.length < 2
             ) {
-                delay(240)
-                runSearch(searchText, selectedSearchKind)
+                if (clean.length < 2) {
+                    liveSearchResults = emptyList()
+                }
+                return@LaunchedEffect
+            }
+
+            delay(220)
+
+            try {
+                val mixed =
+                    coroutineScope {
+                        val artist =
+                            async {
+                                runCatching {
+                                    MusicRepository.search(clean, SearchKind.ARTIST)
+                                }.getOrDefault(emptyList())
+                            }
+
+                        val playlist =
+                            async {
+                                runCatching {
+                                    MusicRepository.search(clean, SearchKind.PLAYLIST)
+                                }.getOrDefault(emptyList())
+                            }
+
+                        val song =
+                            async {
+                                runCatching {
+                                    MusicRepository.search(clean, SearchKind.SONG)
+                                }.getOrDefault(emptyList())
+                            }
+
+                        val album =
+                            async {
+                                runCatching {
+                                    MusicRepository.search(clean, SearchKind.ALBUM)
+                                }.getOrDefault(emptyList())
+                            }
+
+                        buildList {
+                            addAll(artist.await().take(1))
+                            addAll(playlist.await().take(1))
+                            addAll(song.await().take(3))
+                            addAll(album.await().take(1))
+                        }
+                            .distinctBy { it.kind.name + ":" + it.sourceUrl }
+                            .take(6)
+                    }
+
+                if (
+                    selectedTab == MainTab.SEARCH &&
+                    !searchCommitted &&
+                    searchText.trim().equals(clean, ignoreCase = true)
+                ) {
+                    liveSearchResults = mixed
+                }
+            } catch (_: CancellationException) {
+                // Expected while the user keeps typing.
             }
         }
 
@@ -1102,12 +1166,26 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(padding),
                                 text = searchText,
                                 results = searchResults,
+                                liveResults = liveSearchResults,
+                                committed = searchCommitted,
                                 selectedKind = selectedSearchKind,
                                 loading = loadingSearch,
                                 error = error,
-                                onText = { searchText = it },
+                                onText = { value ->
+                                    searchText = value
+                                    searchCommitted = false
+                                    error = null
+
+                                    if (value.isBlank()) {
+                                        searchResults = emptyList()
+                                        liveSearchResults = emptyList()
+                                    }
+                                },
                                 onSubmit = { query, kind -> runSearch(query, kind) },
-                                onSuggestion = { suggestion -> searchText = suggestion },
+                                onSuggestion = { suggestion ->
+                                    searchText = suggestion
+                                    searchCommitted = false
+                                },
                                 onKindChange = { kind ->
                                     selectedSearchKind = kind
                                 },
@@ -1701,6 +1779,8 @@ private fun SearchScreen(
     modifier: Modifier,
     text: String,
     results: List<MusicSearchItem>,
+    liveResults: List<MusicSearchItem>,
+    committed: Boolean,
     selectedKind: SearchKind,
     loading: Boolean,
     error: String?,
@@ -1801,42 +1881,35 @@ private fun SearchScreen(
                 )
             )
 
-            Spacer(Modifier.height(12.dp))
-            Row(
-                Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SearchKind.entries.forEach { kind ->
-                    FilterChip(
-                        selected = selectedKind == kind,
-                        onClick = { onKindChange(kind) },
-                        label = { Text(kind.label) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.36f),
-                            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                            containerColor = Color.Transparent
-                        ),
-                        border = null
-                    )
+            if (committed) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SearchKind.entries.forEach { kind ->
+                        FilterChip(
+                            selected = selectedKind == kind,
+                            onClick = { onKindChange(kind) },
+                            label = { Text(kind.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor =
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.36f),
+                                selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+                                containerColor = Color.Transparent
+                            ),
+                            border = null
+                        )
+                    }
                 }
             }
         }
 
-        if (loading) {
-            item {
-                LinearProgressIndicator(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .padding(horizontal = 18.dp)
-                )
-            }
-            if (results.isEmpty()) {
-                items(5) {
-                    SearchResultShimmer(selectedKind)
-                }
+        if (committed && loading && results.isEmpty()) {
+            items(4) {
+                SearchResultShimmer(selectedKind)
             }
         }
 
@@ -1855,7 +1928,74 @@ private fun SearchScreen(
                 }
             }
 
-        if (!loading && text.isBlank() && results.isEmpty()) {
+        if (!committed && text.isNotBlank()) {
+            if (liveResults.isNotEmpty()) {
+                items(
+                    items = liveResults.take(4),
+                    key = { "live:" + it.kind.name + ":" + it.sourceUrl }
+                ) { item ->
+                    SearchResultRow(
+                        item = item,
+                        favorite =
+                            item.toSongOrNull()?.let(favoriteCheck) ?: false,
+                        onClick = { onOpen(item) },
+                        onFavorite = {
+                            item.toSongOrNull()?.let(onFavorite)
+                        }
+                    )
+                }
+
+                val suggestions =
+                    buildList {
+                        add(text.trim())
+                        liveResults.forEach { item ->
+                            add(item.title.trim())
+                            if (
+                                item.kind == SearchKind.ARTIST &&
+                                item.title.isNotBlank()
+                            ) {
+                                add(item.title.trim() + " songs")
+                            }
+                        }
+                    }
+                        .filter { it.length >= 2 }
+                        .distinctBy { it.lowercase() }
+                        .take(5)
+
+                items(
+                    items = suggestions,
+                    key = { "live-suggestion:" + it.lowercase() }
+                ) { suggestion ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSuggestion(suggestion) }
+                            .padding(horizontal = 26.dp, vertical = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            suggestion.lowercase(),
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Icon(
+                            Icons.Rounded.ArrowBack,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .graphicsLayer { rotationZ = 135f },
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!committed && text.isBlank()) {
             item {
                 Text(
                     "Everything you need",
@@ -1868,7 +2008,7 @@ private fun SearchScreen(
                     onClick = { onSubmit(it, SearchKind.SONG) }
                 )
             }
-        } else if (!loading && results.isEmpty() && text.isNotBlank()) {
+        } else if (committed && !loading && results.isEmpty() && text.isNotBlank()) {
             item {
                 Column(
                     Modifier.fillMaxWidth().padding(top = 70.dp),
@@ -1894,7 +2034,7 @@ private fun SearchScreen(
             }
         }
 
-        if (results.isNotEmpty()) {
+        if (committed && results.isNotEmpty()) {
             if (selectedKind == SearchKind.SONG && text.isNotBlank()) {
                 item {
                     Text(
