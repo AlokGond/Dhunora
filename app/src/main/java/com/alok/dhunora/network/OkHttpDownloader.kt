@@ -1,6 +1,7 @@
 package com.alok.dhunora.network
 
 import android.content.Context
+import android.net.Uri
 import com.alok.dhunora.account.AccountSession
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -34,8 +35,8 @@ class OkHttpDownloader(
         }
 
         val host = runCatching {
-            okhttp3.HttpUrl.get(request.url()).host
-        }.getOrNull().orEmpty()
+            Uri.parse(request.url()).host.orEmpty()
+        }.getOrDefault("")
 
         if (
             host.endsWith("youtube.com") ||
