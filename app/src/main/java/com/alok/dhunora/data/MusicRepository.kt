@@ -150,6 +150,33 @@ object MusicRepository {
                 }
             }
         }
+    suspend fun loadYouTubeLikedMusic(): List<Song> =
+        withContext(Dispatchers.IO) {
+            val urls = listOf(
+                "https://music.youtube.com/playlist?list=LM",
+                "https://www.youtube.com/playlist?list=LM"
+            )
+
+            for (url in urls) {
+                val songs = runCatching {
+                    PlaylistInfo.getInfo(url).relatedItems.map { stream ->
+                        Song(
+                            title = stream.name,
+                            artist = stream.uploaderName ?: "YouTube Music",
+                            sourceUrl = stream.url,
+                            durationSeconds = stream.duration.coerceAtLeast(0),
+                            thumbnailUrl =
+                                youtubeThumbnail(stream.url) ?: bestThumbnail(stream.thumbnails)
+                        )
+                    }.distinctBy { it.sourceUrl }
+                }.getOrDefault(emptyList())
+
+                if (songs.isNotEmpty()) return@withContext songs
+            }
+
+            emptyList()
+        }
+
 
     suspend fun resolveAudioUrl(song: Song): String = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
