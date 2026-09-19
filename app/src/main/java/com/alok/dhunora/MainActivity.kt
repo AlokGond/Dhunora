@@ -2625,14 +2625,22 @@ private fun PlayerAndNavigation(
     onSelect: (MainTab) -> Unit,
     onOpenPlayer: () -> Unit,
     onTogglePlay: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    glassEnabled: Boolean
 ) {
+    val glass =
+        if (glassEnabled) Color(0xC71B1B20)
+        else MaterialTheme.colorScheme.surfaceVariant
+
     Column(
         Modifier
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.98f))
+                    listOf(
+                        Color.Transparent,
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.86f)
+                    )
                 )
             )
             .navigationBarsPadding()
@@ -2642,38 +2650,80 @@ private fun PlayerAndNavigation(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(66.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .height(70.dp)
                     .clickable(onClick = onOpenPlayer),
                 shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 8.dp
+                color =
+                    if (glassEnabled)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                border =
+                    if (glassEnabled)
+                        BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                    else null,
+                tonalElevation = if (glassEnabled) 0.dp else 8.dp
             ) {
                 Column {
                     Row(
-                        Modifier.fillMaxWidth().weight(1f).padding(horizontal = 8.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Artwork(currentSong, Modifier.size(50.dp), 12.dp)
+                        Artwork(currentSong, Modifier.size(52.dp), 9.dp)
                         Spacer(Modifier.width(10.dp))
+
                         Column(Modifier.weight(1f)) {
-                            Text(currentSong.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(currentSong.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                currentSong.title,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                currentSong.artist,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
+
                         IconButton(onClick = onTogglePlay) {
-                            if (buffering) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                            else Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
+                            if (buffering) {
+                                CircularProgressIndicator(
+                                    Modifier.size(22.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    if (isPlaying)
+                                        Icons.Rounded.Pause
+                                    else
+                                        Icons.Rounded.PlayArrow,
+                                    null
+                                )
+                            }
                         }
-                        IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, "Next") }
+
+                        IconButton(onClick = onNext) {
+                            Icon(Icons.Rounded.SkipNext, "Next")
+                        }
                     }
+
                     LinearProgressIndicator(
                         progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = Color.Transparent
                     )
                 }
             }
+
             Spacer(Modifier.height(7.dp))
         }
 
@@ -2684,11 +2734,17 @@ private fun PlayerAndNavigation(
         ) {
             Surface(
                 shape = RoundedCornerShape(34.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 6.dp
+                color = glass,
+                border =
+                    if (glassEnabled)
+                        BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+                    else null,
+                tonalElevation = if (glassEnabled) 0.dp else 6.dp
             ) {
                 Row(
-                    Modifier.height(64.dp).padding(6.dp),
+                    Modifier
+                        .height(66.dp)
+                        .padding(5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     BottomTab(
@@ -2698,6 +2754,12 @@ private fun PlayerAndNavigation(
                         onClick = { onSelect(MainTab.HOME) }
                     )
                     BottomTab(
+                        icon = Icons.Rounded.Radio,
+                        label = "Mix",
+                        selected = selectedTab == MainTab.MIX,
+                        onClick = { onSelect(MainTab.MIX) }
+                    )
+                    BottomTab(
                         icon = Icons.Rounded.LibraryMusic,
                         label = "Library",
                         selected = selectedTab == MainTab.LIBRARY,
@@ -2705,18 +2767,33 @@ private fun PlayerAndNavigation(
                     )
                 }
             }
-            Spacer(Modifier.width(12.dp))
+
+            Spacer(Modifier.width(10.dp))
+
             Surface(
-                modifier = Modifier.size(56.dp).clickable { onSelect(MainTab.SEARCH) },
+                modifier = Modifier
+                    .size(58.dp)
+                    .clickable { onSelect(MainTab.SEARCH) },
                 shape = CircleShape,
-                color = if (selectedTab == MainTab.SEARCH) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 6.dp
+                color =
+                    if (selectedTab == MainTab.SEARCH)
+                        MaterialTheme.colorScheme.primary
+                    else glass,
+                border =
+                    if (glassEnabled && selectedTab != MainTab.SEARCH)
+                        BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+                    else null,
+                tonalElevation = if (glassEnabled) 0.dp else 6.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Rounded.Search,
                         null,
-                        tint = if (selectedTab == MainTab.SEARCH) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint =
+                            if (selectedTab == MainTab.SEARCH)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -2732,7 +2809,7 @@ private fun BottomTab(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.width(92.dp).fillMaxHeight().clickable(onClick = onClick),
+        modifier = Modifier.width(84.dp).fillMaxHeight().clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
         color = if (selected) MaterialTheme.colorScheme.background.copy(alpha = 0.72f) else Color.Transparent
     ) {
