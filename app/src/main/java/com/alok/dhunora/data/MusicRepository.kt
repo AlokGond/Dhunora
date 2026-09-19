@@ -24,6 +24,7 @@ object MusicRepository {
     private data class CachedAudio(val url: String, val cachedAtMs: Long)
 
     private val audioUrlCache = ConcurrentHashMap<String, CachedAudio>()
+    private val relatedSongsCache = ConcurrentHashMap<String, List<Song>>()
     private const val AUDIO_CACHE_TTL_MS = 20L * 60L * 1000L
 
     suspend fun searchSongs(query: String): List<Song> =
@@ -235,6 +236,162 @@ object MusicRepository {
             }
 
             else -> null
+        }
+
+    suspend fun relatedSongs(song: Song): List<Song> =
+        withContext(Dispatchers.IO) {
+            relatedSongsCache[song.sourceUrl]?.let {
+                return@withContext it
+            }
+
+            val directRelated =
+                runCatching {
+                    StreamInfo.getInfo(ServiceList.YouTube, song.sourceUrl)
+                        .relatedItems
+                        .filterIsInstance<StreamInfoItem>()
+                        .map { item ->
+                            Song(
+                                title = item.name,
+                                artist = item.uploaderName ?: "Unknown artist",
+                                sourceUrl = item.url,
+                                durationSeconds = item.duration.coerceAtLeast(0),
+                                thumbnailUrl =
+                                    youtubeThumbnail(item.url) ?: bestThumbnail(item.thumbnails)
+                            )
+                        }
+                        .filter { candidate ->
+                            candidate.sourceUrl != song.sourceUrl &&
+                                candidate.durationSeconds !in 1..44
+                        }
+                }.getOrDefault(emptyList())
+
+            val searched =
+                coroutineScope {
+                    val artistJob =
+                        async(Dispatchers.IO) {
+                            runCatching {
+                                doSearch(
+                                    song.artist + " songs",
+                                    YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                                    SearchKind.SONG
+                                )
+                            }.getOrDefault(emptyList())
+                        }
+
+                    val similarJob =
+                        async(Dispatchers.IO) {
+                            runCatching {
+                                doSearch(
+                                    song.title + " " + song.artist,
+                                    YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                                    SearchKind.SONG
+                                )
+                            }.getOrDefault(emptyList())
+                        }
+
+                    (artistJob.await() + similarJob.await())
+                        .mapNotNull { it.toSongOrNull() }
+                }
+
+            val result =
+                (directRelated + searched)
+                    .filter { it.sourceUrl != song.sourceUrl }
+                    .distinctBy { it.sourceUrl }
+                    .take(35)
+
+            relatedSongsCache[song.sourceUrl] = result
+            result
+        }
+
+    suspend fun personalizedHome(
+        recent: List<Song>,
+        favorites: List<Song>,
+        accountLikes: List<Song>
+    ): List<Song> =
+        withContext(Dispatchers.IO) {
+            val seeds =
+                (recent.take(12) + favorites.take(8) + accountLikes.take(8))
+                    .filter { it.artist.isNotBlank() }
+                    .distinctBy { it.sourceUrl }
+
+            if (seeds.isEmpty()) {
+                return@withContext runCatching {
+                    doSearch(
+                        "Top music India",
+                        YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                        SearchKind.SONG
+                    ).mapNotNull { it.toSongOrNull() }
+                }.getOrDefault(emptyList())
+            }
+
+            val artistCounts = linkedMapOf<String, Int>()
+            seeds.forEachIndexed { index, song ->
+                val weight = (seeds.size - index).coerceAtLeast(1)
+                val artist = song.artist.trim()
+                if (
+                    artist.isNotBlank() &&
+                    !artist.equals("Unknown artist", ignoreCase = true)
+                ) {
+                    artistCounts[artist] = (artistCounts[artist] ?: 0) + weight
+                }
+            }
+
+            val topArtists =
+                artistCounts.entries
+                    .sortedByDescending { it.value }
+                    .map { it.key }
+                    .take(4)
+
+            val queries = mutableListOf<String>()
+            topArtists.forEach { artist ->
+                queries += artist + " hits"
+            }
+
+            seeds.take(3).forEach { seed ->
+                queries += seed.title + " " + seed.artist
+            }
+
+            if (queries.size < 4) {
+                queries += listOf(
+                    "New Bollywood music",
+                    "Trending Punjabi songs",
+                    "Indian music hits"
+                )
+            }
+
+            val buckets =
+                coroutineScope {
+                    queries
+                        .distinct()
+                        .take(7)
+                        .map { query ->
+                            async(Dispatchers.IO) {
+                                runCatching {
+                                    doSearch(
+                                        query,
+                                        YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                                        SearchKind.SONG
+                                    ).mapNotNull { it.toSongOrNull() }
+                                }.getOrDefault(emptyList())
+                            }
+                        }
+                        .map { it.await() }
+                }
+
+            val interleaved = mutableListOf<Song>()
+            val maxSize = buckets.maxOfOrNull { it.size } ?: 0
+            for (index in 0 until maxSize) {
+                buckets.forEach { bucket ->
+                    bucket.getOrNull(index)?.let { interleaved += it }
+                }
+            }
+
+            val seedUrls = seeds.map { it.sourceUrl }.toSet()
+
+            interleaved
+                .filter { it.sourceUrl !in seedUrls }
+                .distinctBy { it.sourceUrl }
+                .take(50)
         }
 
     suspend fun loadCollection(item: MusicSearchItem): List<Song> =
