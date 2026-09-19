@@ -37,24 +37,79 @@ object MusicRepository {
             val key = kind.name + ":" + clean.lowercase()
             typedSearchCache[key]?.let { return@withContext it }
 
-            val filter = when (kind) {
-                SearchKind.SONG -> YoutubeSearchQueryHandlerFactory.MUSIC_SONGS
-                SearchKind.ALBUM -> YoutubeSearchQueryHandlerFactory.MUSIC_ALBUMS
-                SearchKind.PLAYLIST -> YoutubeSearchQueryHandlerFactory.MUSIC_PLAYLISTS
-                SearchKind.ARTIST -> YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS
-            }
-
-            val primary = runCatching {
-                doSearch(clean, filter, kind)
-            }.getOrDefault(emptyList())
-
             val results =
-                if (kind == SearchKind.ARTIST && primary.isEmpty()) {
-                    runCatching {
-                        doSearch(clean, YoutubeSearchQueryHandlerFactory.CHANNELS, kind)
-                    }.getOrDefault(emptyList())
-                } else {
-                    primary
+                when (kind) {
+                    SearchKind.SONG ->
+                        coroutineScope {
+                            val musicJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doSearch(
+                                            clean,
+                                            YoutubeSearchQueryHandlerFactory.MUSIC_SONGS,
+                                            SearchKind.SONG
+                                        )
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            val generalJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch(clean)
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            val audioJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch(clean + " official audio")
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            val songJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch(clean + " song")
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            (
+                                musicJob.await() +
+                                    generalJob.await() +
+                                    audioJob.await() +
+                                    songJob.await()
+                            )
+                                .distinctBy { it.sourceUrl }
+                                .sortedByDescending { scoreSongResult(clean, it) }
+                                .take(50)
+                        }
+
+                    else -> {
+                        val filter =
+                            when (kind) {
+                                SearchKind.ALBUM -> YoutubeSearchQueryHandlerFactory.MUSIC_ALBUMS
+                                SearchKind.PLAYLIST -> YoutubeSearchQueryHandlerFactory.MUSIC_PLAYLISTS
+                                SearchKind.ARTIST -> YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS
+                                SearchKind.SONG -> YoutubeSearchQueryHandlerFactory.MUSIC_SONGS
+                            }
+
+                        val primary =
+                            runCatching {
+                                doSearch(clean, filter, kind)
+                            }.getOrDefault(emptyList())
+
+                        if (kind == SearchKind.ARTIST && primary.isEmpty()) {
+                            runCatching {
+                                doSearch(
+                                    clean,
+                                    YoutubeSearchQueryHandlerFactory.CHANNELS,
+                                    kind
+                                )
+                            }.getOrDefault(emptyList())
+                        } else {
+                            primary
+                        }
+                    }
                 }
 
             typedSearchCache[key] = results
@@ -67,15 +122,72 @@ object MusicRepository {
         requestedKind: SearchKind
     ): List<MusicSearchItem> {
         val service = ServiceList.YouTube
-        val handler = service.searchQHFactory.fromQuery(
-            query,
-            listOf(contentFilter),
-            ""
-        )
+        val handler =
+            service.searchQHFactory.fromQuery(
+                query,
+                listOf(contentFilter),
+                ""
+            )
 
         return SearchInfo.getInfo(service, handler).relatedItems
             .mapNotNull { item -> item.toSearchItem(requestedKind) }
             .distinctBy { it.sourceUrl }
+    }
+
+    private fun doGeneralSongSearch(query: String): List<MusicSearchItem> {
+        val service = ServiceList.YouTube
+        val handler = service.searchQHFactory.fromQuery(query)
+
+        return SearchInfo.getInfo(service, handler).relatedItems
+            .filterIsInstance<StreamInfoItem>()
+            .map { item ->
+                MusicSearchItem(
+                    kind = SearchKind.SONG,
+                    title = item.name,
+                    subtitle = item.uploaderName ?: "Unknown artist",
+                    sourceUrl = item.url,
+                    thumbnailUrl =
+                        youtubeThumbnail(item.url) ?: bestThumbnail(item.thumbnails),
+                    durationSeconds = item.duration.coerceAtLeast(0)
+                )
+            }
+            .distinctBy { it.sourceUrl }
+    }
+
+    private fun scoreSongResult(
+        query: String,
+        item: MusicSearchItem
+    ): Int {
+        val q = query.lowercase().trim()
+        val haystack = (item.title + " " + item.subtitle).lowercase()
+        val tokens =
+            q.split(Regex("\\s+"))
+                .filter { it.length >= 2 }
+                .distinct()
+
+        var score = 0
+        if (haystack.contains(q)) score += 40
+        score += tokens.count { haystack.contains(it) } * 9
+
+        if (item.durationSeconds in 60..900) score += 8
+        if (
+            haystack.contains("official audio") ||
+            haystack.contains("official song") ||
+            haystack.contains("music")
+        ) {
+            score += 6
+        }
+
+        if (
+            haystack.contains("reaction") ||
+            haystack.contains("trailer") ||
+            haystack.contains("shorts") ||
+            haystack.contains("status video")
+        ) {
+            score -= 18
+        }
+
+        return score
     }
 
     private fun InfoItem.toSearchItem(requestedKind: SearchKind): MusicSearchItem? =
