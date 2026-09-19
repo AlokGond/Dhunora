@@ -1,9 +1,17 @@
 package com.alok.dhunora
 
+import android.app.DownloadManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,6 +42,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
@@ -107,14 +123,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
+import com.alok.dhunora.account.AccountSession
+import com.alok.dhunora.account.LoginActivity
+import com.alok.dhunora.data.LocalPlaylistStore
 import com.alok.dhunora.data.MusicRepository
 import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -126,6 +147,7 @@ private enum class PlayerPane { UP_NEXT, LYRICS }
 
 class MainActivity : ComponentActivity() {
     private lateinit var player: ExoPlayer
+    private var sleepTimerJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -146,6 +168,71 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         player.release()
         super.onDestroy()
+    }
+
+
+    private fun downloadSong(song: Song) {
+        lifecycleScope.launch {
+            val url =
+                runCatching { MusicRepository.resolveAudioUrl(song) }
+                    .getOrElse {
+                        Toast.makeText(this@MainActivity, "Download failed", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+
+            val safeName =
+                song.title
+                    .replace(Regex("[^A-Za-z0-9 _.-]"), "")
+                    .trim()
+                    .take(80)
+                    .ifBlank { "Dhunora song" }
+
+            val request =
+                DownloadManager.Request(Uri.parse(url))
+                    .setTitle(song.title)
+                    .setDescription(song.artist)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(
+                        Environment.DIRECTORY_MUSIC,
+                        "Dhunora/" + safeName + ".m4a"
+                    )
+
+            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            manager.enqueue(request)
+            Toast.makeText(this@MainActivity, "Download started", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun shareSong(song: Song) {
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, song.title)
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    song.title + " — " + song.artist + "\n" + song.sourceUrl
+                )
+            }
+        startActivity(Intent.createChooser(intent, "Share song"))
+    }
+
+    private fun addToMyPlaylist(song: Song) {
+        LocalPlaylistStore.addToMyPlaylist(this, song)
+        Toast.makeText(this, "Added to My Playlist", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        sleepTimerJob =
+            lifecycleScope.launch {
+                delay(minutes * 60_000L)
+                player.pause()
+            }
+        Toast.makeText(this, "Sleep timer: " + minutes + " min", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setPlayback(speed: Float, pitch: Float) {
+        player.playbackParameters = PlaybackParameters(speed, pitch)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
