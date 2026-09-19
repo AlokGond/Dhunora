@@ -762,6 +762,23 @@ class MainActivity : ComponentActivity() {
             openedSearchItem = null
             openedSearchSongs = emptyList()
         }
+        BackHandler(
+            enabled =
+                !playerExpanded &&
+                    openedSearchItem == null &&
+                    libraryCollection != null
+        ) {
+            libraryCollection = null
+        }
+        BackHandler(
+            enabled =
+                !playerExpanded &&
+                    openedSearchItem == null &&
+                    libraryCollection == null &&
+                    showSettings
+        ) {
+            showSettings = false
+        }
 
         MaterialTheme(colorScheme = colors) {
             Box(
@@ -792,7 +809,9 @@ class MainActivity : ComponentActivity() {
                         onPrevious = { playPrevious() },
                         onNext = { playNext() },
                         onPane = { playerPane = it },
-                        onPlaySong = { playSong(it) }
+                        onPlaySong = { playSong(it) },
+                        style = nowPlayingStyle,
+                        liquidGlass = liquidGlass
                     )
                 } else if (openedSearchItem != null) {
                     CollectionDetailScreen(
@@ -814,6 +833,60 @@ class MainActivity : ComponentActivity() {
                         onFavorite = { toggleFavorite(it) },
                         favoriteCheck = { isFavorite(it) }
                     )
+                } else if (libraryCollection != null) {
+                    LibraryCollectionScreen(
+                        collection = libraryCollection!!,
+                        favorites = favorites,
+                        onBack = { libraryCollection = null },
+                        onPlay = { song ->
+                            val songs = libraryCollection?.songs.orEmpty()
+                            if (songs.isNotEmpty()) {
+                                playSong(song, songs)
+                            } else {
+                                playSong(song)
+                            }
+                        },
+                        onFavorite = { toggleFavorite(it) }
+                    )
+                } else if (showSettings) {
+                    SettingsScreen(
+                        youtubeLoggedIn = youtubeLoggedIn,
+                        translucentNav = translucentNav,
+                        liquidGlass = liquidGlass,
+                        romanizedLyrics = romanizedLyrics,
+                        nowPlayingStyle = nowPlayingStyle,
+                        lyricsStyle = lyricsStyle,
+                        themeColor = themeColor,
+                        onBack = { showSettings = false },
+                        onAccount = {
+                            showSettings = false
+                            openAccount()
+                        },
+                        onTranslucentNav = {
+                            translucentNav = it
+                            UiSettingsStore.setTranslucentNav(this@MainActivity, it)
+                        },
+                        onLiquidGlass = {
+                            liquidGlass = it
+                            UiSettingsStore.setLiquidGlass(this@MainActivity, it)
+                        },
+                        onRomanizedLyrics = {
+                            romanizedLyrics = it
+                            UiSettingsStore.setRomanizedLyrics(this@MainActivity, it)
+                        },
+                        onNowPlayingStyle = {
+                            nowPlayingStyle = it
+                            UiSettingsStore.setNowPlayingStyle(this@MainActivity, it)
+                        },
+                        onLyricsStyle = {
+                            lyricsStyle = it
+                            UiSettingsStore.setLyricsStyle(this@MainActivity, it)
+                        },
+                        onThemeColor = {
+                            themeColor = it
+                            UiSettingsStore.setThemeColor(this@MainActivity, it)
+                        }
+                    )
                 } else {
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.background,
@@ -830,7 +903,8 @@ class MainActivity : ComponentActivity() {
                                     if (player.isPlaying) player.pause() else player.play()
                                     isPlaying = player.isPlaying
                                 },
-                                onNext = { playNext() }
+                                onNext = { playNext() },
+                                glassEnabled = translucentNav || liquidGlass
                             )
                         }
                     ) { padding ->
@@ -846,9 +920,26 @@ class MainActivity : ComponentActivity() {
                                 onPlay = { startRecommendationRadio(it) },
                                 onFavorite = { toggleFavorite(it) },
                                 favoriteCheck = { isFavorite(it) },
+                                youtubeLoggedIn = youtubeLoggedIn,
+                                onAccount = { openAccount() },
                                 onSearch = { selectedTab = MainTab.SEARCH },
                                 onHistory = { selectedTab = MainTab.LIBRARY },
+                                onNotifications = {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "No new music notifications",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
                                 onSettings = { showSettings = true }
+                            )
+                            MainTab.MIX -> MixScreen(
+                                modifier = Modifier.padding(padding),
+                                songs = (quickPicks + madeForYou + trending)
+                                    .distinctBy { it.sourceUrl },
+                                onPlay = { startRecommendationRadio(it) },
+                                onFavorite = { toggleFavorite(it) },
+                                favoriteCheck = { isFavorite(it) }
                             )
                             MainTab.SEARCH -> SearchScreen(
                                 modifier = Modifier.padding(padding),
@@ -881,24 +972,18 @@ class MainActivity : ComponentActivity() {
                                 onPlay = { playSong(it) },
                                 onFavorite = { toggleFavorite(it) },
                                 onSearch = { selectedTab = MainTab.SEARCH },
-                                onAccount = { openAccount() }
+                                onAccount = { openAccount() },
+                                onOpenCollection = { title, subtitle, songs, downloadItems ->
+                                    libraryCollection =
+                                        LibraryCollection(
+                                            title = title,
+                                            subtitle = subtitle,
+                                            songs = songs,
+                                            downloads = downloadItems
+                                        )
+                                }
                             )
                         }
-                    }
-                }
-
-                if (showSettings) {
-                    ModalBottomSheet(
-                        onDismissRequest = { showSettings = false },
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ) {
-                        SettingsSheet(
-                            youtubeLoggedIn = youtubeLoggedIn,
-                            onAccount = {
-                                showSettings = false
-                                openAccount()
-                            }
-                        )
                     }
                 }
 
