@@ -12,6 +12,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -2209,6 +2210,282 @@ private fun LibraryHeroCard(
             }
             Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun SongActionSheet(
+    song: Song,
+    favorite: Boolean,
+    onLike: () -> Unit,
+    onDownload: () -> Unit,
+    onAddPlaylist: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddQueue: () -> Unit,
+    onArtist: () -> Unit,
+    onAlbum: () -> Unit,
+    onRadio: () -> Unit,
+    onLyrics: () -> Unit,
+    onSleep: (Int) -> Unit,
+    onPlayback: (Float, Float) -> Unit,
+    onShare: () -> Unit
+) {
+    var page by rememberSaveable { mutableStateOf("root") }
+    var speed by remember { mutableFloatStateOf(1f) }
+    var pitch by remember { mutableFloatStateOf(1f) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .padding(bottom = 26.dp)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Artwork(song, Modifier.size(80.dp), 6.dp)
+            Spacer(Modifier.width(18.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    song.artist,
+                    fontSize = 14.sp,
+                    color = Color(0xFFB8B8B8),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        HorizontalDivider(
+            Modifier.padding(horizontal = 28.dp, vertical = 4.dp),
+            color = Color(0xFF4A4A4A)
+        )
+
+        when (page) {
+            "sleep" -> {
+                SheetBackHeader("Sleep Timer") { page = "root" }
+                listOf(15, 30, 45, 60).forEach { minutes ->
+                    ActionRow(
+                        icon = Icons.Rounded.Timer,
+                        title = minutes.toString() + " minutes",
+                        onClick = { onSleep(minutes) }
+                    )
+                }
+            }
+
+            "speed" -> {
+                SheetBackHeader("Playback speed & pitch") { page = "root" }
+
+                Column(Modifier.padding(horizontal = 28.dp, vertical = 8.dp)) {
+                    Text(
+                        "Speed  " + String.format("%.2fx", speed),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Slider(
+                        value = speed,
+                        onValueChange = {
+                            speed = it
+                            onPlayback(speed, pitch)
+                        },
+                        valueRange = 0.5f..2f,
+                        steps = 5
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Text(
+                        "Pitch  " + String.format("%.2fx", pitch),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Slider(
+                        value = pitch,
+                        onValueChange = {
+                            pitch = it
+                            onPlayback(speed, pitch)
+                        },
+                        valueRange = 0.5f..1.5f,
+                        steps = 3
+                    )
+                }
+            }
+
+            else -> {
+                ActionRow(
+                    icon = if (favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    title = if (favorite) "Liked" else "Like",
+                    onClick = onLike
+                )
+                ActionRow(Icons.Rounded.Download, "Download", onClick = onDownload)
+                ActionRow(Icons.Rounded.PlaylistAdd, "Add to a playlist", onClick = onAddPlaylist)
+                ActionRow(Icons.Rounded.PlayCircle, "Play next", onClick = onPlayNext)
+                ActionRow(Icons.Rounded.QueueMusic, "Add to queue", onClick = onAddQueue)
+                ActionRow(
+                    Icons.Rounded.Person,
+                    "Artists",
+                    subtitle = song.artist,
+                    onClick = onArtist
+                )
+                ActionRow(
+                    Icons.Rounded.Album,
+                    "Album",
+                    subtitle = song.title,
+                    onClick = onAlbum
+                )
+                ActionRow(Icons.Rounded.Radio, "Start radio", onClick = onRadio)
+                ActionRow(Icons.Rounded.MusicNote, "Main Lyrics Provider", onClick = onLyrics)
+                ActionRow(Icons.Rounded.Timer, "Sleep Timer", onClick = { page = "sleep" })
+                ActionRow(
+                    Icons.Rounded.Speed,
+                    "Playback speed & pitch",
+                    onClick = { page = "speed" }
+                )
+                ActionRow(Icons.Rounded.Share, "Share", onClick = onShare)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetBackHeader(
+    title: String,
+    onBack: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onBack)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Rounded.ArrowBack,
+            contentDescription = "Back",
+            tint = Color.White
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(
+            title,
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+    }
+}
+
+@Composable
+private fun ActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 30.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(Modifier.width(24.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                color = Color.White,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    color = Color(0xFFAAAAAA),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountSheet(
+    likedCount: Int,
+    onOpenLiked: () -> Unit,
+    onLogout: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 34.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                Modifier.size(54.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "Y",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 22.sp
+                    )
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(
+                    "YouTube Music connected",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    likedCount.toString() + " liked songs synced",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        SettingRow(
+            Icons.Rounded.Favorite,
+            "YouTube Liked Music",
+            "Open synced liked songs",
+            onClick = onOpenLiked
+        )
+        SettingRow(
+            Icons.Rounded.Person,
+            "Sign out",
+            "Remove this YouTube Music session",
+            onClick = onLogout
+        )
     }
 }
 
