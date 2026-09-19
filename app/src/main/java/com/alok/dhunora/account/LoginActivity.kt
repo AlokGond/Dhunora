@@ -43,7 +43,8 @@ class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        CookieManager.getInstance().setAcceptCookie(true)
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
 
         setContent {
             var progress by remember { mutableFloatStateOf(0f) }
