@@ -1042,7 +1042,10 @@ private fun HomeScreen(
                 contentPadding = PaddingValues(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(madeForYou) { song ->
+                items(
+                    items = madeForYou,
+                    key = { "made:" + it.sourceUrl }
+                ) { song ->
                     SquareSongCard(song = song, onClick = { onPlay(song) })
                 }
             }
@@ -1744,7 +1747,10 @@ private fun LibraryScreen(
                 )
             }
         } else {
-            items(recent) { song ->
+            items(
+                items = recent,
+                key = { "recent:" + it.sourceUrl }
+            ) { song ->
                 SongListRow(
                     song = song,
                     favorite = favorites.any { it.sourceUrl == song.sourceUrl },
