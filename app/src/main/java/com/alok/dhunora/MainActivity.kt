@@ -16,6 +16,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -122,6 +124,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -657,7 +660,7 @@ class MainActivity : ComponentActivity() {
                 selectedTab == MainTab.SEARCH &&
                 searchText.trim().length >= 2
             ) {
-                delay(450)
+                delay(240)
                 runSearch(searchText, selectedSearchKind)
             }
         }
@@ -697,7 +700,8 @@ class MainActivity : ComponentActivity() {
             )
                 .joinToString("|") { it.sourceUrl }
 
-        LaunchedEffect(homeProfileKey, selectedMood) {
+        LaunchedEffect(homeProfileKey, selectedMood, selectedTab) {
+            if (selectedTab != MainTab.HOME) return@LaunchedEffect
             loadingHome = true
 
             val songs =
@@ -932,7 +936,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     ) { padding ->
-                        when (selectedTab) {
+                        Crossfade(
+                            targetState = selectedTab,
+                            animationSpec = tween(durationMillis = 180),
+                            label = "main_tab_crossfade"
+                        ) { activeTab ->
+                        when (activeTab) {
                             MainTab.HOME -> HomeScreen(
                                 modifier = Modifier.padding(padding),
                                 quickPicks = quickPicks,
@@ -976,9 +985,9 @@ class MainActivity : ComponentActivity() {
                                 error = error,
                                 onText = { searchText = it },
                                 onSubmit = { query, kind -> runSearch(query, kind) },
+                                onSuggestion = { suggestion -> searchText = suggestion },
                                 onKindChange = { kind ->
                                     selectedSearchKind = kind
-                                    if (searchText.isNotBlank()) runSearch(searchText, kind)
                                 },
                                 onOpen = { openSearchResult(it) },
                                 onFavorite = { song -> toggleFavorite(song) },
@@ -1009,6 +1018,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                 }
                             )
+                        }
                         }
                     }
                 }
@@ -1574,6 +1584,7 @@ private fun SearchScreen(
     error: String?,
     onText: (String) -> Unit,
     onSubmit: (String, SearchKind) -> Unit,
+    onSuggestion: (String) -> Unit,
     onKindChange: (SearchKind) -> Unit,
     onOpen: (MusicSearchItem) -> Unit,
     onFavorite: (Song) -> Unit,
@@ -1694,11 +1705,16 @@ private fun SearchScreen(
         if (loading) {
             item {
                 LinearProgressIndicator(
-                    Modifier.fillMaxWidth().padding(top = 8.dp)
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .padding(horizontal = 18.dp)
                 )
             }
-            items(5) {
-                SearchResultShimmer(selectedKind)
+            if (results.isEmpty()) {
+                items(5) {
+                    SearchResultShimmer(selectedKind)
+                }
             }
         }
 
@@ -1749,28 +1765,101 @@ private fun SearchScreen(
                     )
                 }
             }
-        } else if (!loading) {
-            item {
-                Text(
-                    selectedKind.label,
-                    Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+        }
+
+        if (results.isNotEmpty()) {
+            if (selectedKind == SearchKind.SONG && text.isNotBlank()) {
+                item {
+                    Text(
+                        "Top results",
+                        Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                items(
+                    items = results.take(5),
+                    key = { "top:" + it.sourceUrl }
+                ) { item ->
+                    SearchResultRow(
+                        item = item,
+                        favorite = item.toSongOrNull()?.let(favoriteCheck) ?: false,
+                        onClick = { onOpen(item) },
+                        onFavorite = { item.toSongOrNull()?.let(onFavorite) }
+                    )
+                }
+
+                val suggestions =
+                    results
+                        .drop(5)
+                        .map { it.title.trim() }
+                        .filter { it.isNotBlank() }
+                        .distinctBy { it.lowercase() }
+                        .take(5)
+
+                items(
+                    items = suggestions,
+                    key = { "suggest:" + it.lowercase() }
+                ) { suggestion ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSuggestion(suggestion) }
+                            .padding(horizontal = 26.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            suggestion.lowercase(),
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(
+                            Icons.Rounded.ArrowBack,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .graphicsLayer { rotationZ = 135f },
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                if (results.size > 5) {
+                    item {
+                        Text(
+                            "More songs",
+                            Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+            } else {
+                item {
+                    Text(
+                        selectedKind.label,
+                        Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
             }
 
             items(
-                items = results,
-                key = { it.kind.name + ":" + it.sourceUrl }
+                items =
+                    if (selectedKind == SearchKind.SONG && text.isNotBlank()) results.drop(5)
+                    else results,
+                key = { "all:" + it.kind.name + ":" + it.sourceUrl }
             ) { item ->
                 SearchResultRow(
                     item = item,
-                    favorite =
-                        item.toSongOrNull()?.let(favoriteCheck) ?: false,
+                    favorite = item.toSongOrNull()?.let(favoriteCheck) ?: false,
                     onClick = { onOpen(item) },
-                    onFavorite = {
-                        item.toSongOrNull()?.let(onFavorite)
-                    }
+                    onFavorite = { item.toSongOrNull()?.let(onFavorite) }
                 )
             }
         }
@@ -1876,9 +1965,7 @@ private fun SearchArtwork(
                 model = item.thumbnailUrl,
                 contentDescription = item.title,
                 modifier = Modifier.fillMaxSize(),
-                contentScale =
-                    if (item.kind == SearchKind.ARTIST) ContentScale.Crop
-                    else ContentScale.FillWidth
+                contentScale = ContentScale.Crop
             )
         } else {
             Box(
@@ -3047,7 +3134,11 @@ private fun NowPlayingScreen(
                         value = dragging,
                         onValueChange = { dragging = it },
                         onValueChangeFinished = { onSeek(dragging) },
-                        valueRange = 0f..1f
+                        valueRange = 0f..1f,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(22.dp)
+                            .graphicsLayer { scaleY = 0.48f }
                     )
 
                     Row(Modifier.fillMaxWidth()) {
