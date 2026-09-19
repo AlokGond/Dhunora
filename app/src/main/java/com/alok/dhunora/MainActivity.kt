@@ -633,33 +633,54 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(Unit) {
-            loadingHome = true
-            val songs = runCatching {
-                MusicRepository.searchSongs("Top hits India Bollywood Punjabi 2026")
-            }.getOrDefault(emptyList())
+        val homeProfileKey =
+            (
+                recentSongs.take(8) +
+                    favorites.take(6) +
+                    youtubeLikedSongs.take(6)
+            )
+                .joinToString("|") { it.sourceUrl }
 
-            quickPicks = songs.take(12)
-            madeForYou = songs.drop(3).take(10)
-            trending = songs.reversed().take(10)
+        LaunchedEffect(homeProfileKey, selectedMood) {
+            loadingHome = true
+
+            val songs =
+                if (selectedMood == "All") {
+                    runCatching {
+                        MusicRepository.personalizedHome(
+                            recent = recentSongs,
+                            favorites = favorites,
+                            accountLikes = youtubeLikedSongs
+                        )
+                    }.getOrDefault(emptyList())
+                } else {
+                    runCatching {
+                        MusicRepository.searchSongs(selectedMood + " music")
+                    }.getOrDefault(emptyList())
+                }
+
+            val fallback =
+                if (songs.isEmpty()) {
+                    runCatching {
+                        MusicRepository.searchSongs("Top music India")
+                    }.getOrDefault(emptyList())
+                } else {
+                    songs
+                }
+
+            quickPicks = fallback.take(12)
+            madeForYou =
+                fallback.drop(12).take(10)
+                    .ifEmpty { fallback.drop(4).take(10) }
+            trending =
+                fallback.drop(22).take(12)
+                    .ifEmpty { fallback.drop(8).take(12) }
 
             lifecycleScope.launch {
-                MusicRepository.prefetchAudioUrls(songs.take(2))
+                MusicRepository.prefetchAudioUrls(fallback.take(2))
             }
 
             loadingHome = false
-        }
-
-        LaunchedEffect(selectedMood) {
-            if (selectedMood != "All") {
-                loadingHome = true
-                runCatching { MusicRepository.searchSongs("$selectedMood music") }
-                    .onSuccess {
-                        quickPicks = it.take(12)
-                        madeForYou = it.drop(2).take(10)
-                    }
-                loadingHome = false
-            }
         }
 
         LaunchedEffect(currentSong, playerExpanded) {
@@ -1118,7 +1139,7 @@ private fun HomeScreen(
 
         item {
             Spacer(Modifier.height(28.dp))
-            SectionHeader("Trending now", "MORE", onSearch)
+            SectionHeader("More for you", "MORE", onSearch)
         }
 
         items(trending.take(8)) { song ->
