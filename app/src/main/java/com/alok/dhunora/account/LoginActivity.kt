@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class LoginActivity : ComponentActivity() {
 
@@ -124,12 +126,15 @@ class LoginActivity : ComponentActivity() {
                                                     cookie.contains("SID=")
                                                 ) {
                                                     AccountSession.saveCookie(this@LoginActivity, cookie)
-                                                    Toast.makeText(
-                                                        this@LoginActivity,
-                                                        "YouTube Music account connected",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                    finish()
+                                                    lifecycleScope.launch {
+                                                        AccountProfileRepository.refresh(this@LoginActivity)
+                                                        Toast.makeText(
+                                                            this@LoginActivity,
+                                                            "YouTube Music account connected",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        finish()
+                                                    }
                                                 }
                                             }
                                         }
