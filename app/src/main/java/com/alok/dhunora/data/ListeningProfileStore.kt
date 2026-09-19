@@ -8,6 +8,7 @@ import org.json.JSONObject
 object ListeningProfileStore {
     private const val PREFS = "dhunora_listening_profile"
     private const val KEY_RECENT = "recent"
+    private const val KEY_SEARCHES = "searches"
 
     fun recordPlay(context: Context, song: Song) {
         val existing = recent(context).toMutableList()
@@ -35,6 +36,44 @@ object ListeningProfileStore {
                             thumbnailUrl = o.optString("thumb").takeIf { it.isNotBlank() }
                         )
                     )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+
+    fun recordSearch(context: Context, query: String) {
+        val clean =
+            query.trim()
+                .replace(Regex("\\s+"), " ")
+                .take(100)
+        if (clean.length < 2) return
+
+        val existing = recentSearches(context).toMutableList()
+        existing.removeAll { it.equals(clean, ignoreCase = true) }
+        existing.add(0, clean)
+
+        val arr = JSONArray()
+        existing.take(20).forEach(arr::put)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SEARCHES, arr.toString())
+            .apply()
+    }
+
+    fun recentSearches(context: Context): List<String> {
+        val raw =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_SEARCHES, "[]") ?: "[]"
+
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    arr.optString(i)
+                        .trim()
+                        .takeIf { it.isNotBlank() }
+                        ?.let(::add)
                 }
             }
         }.getOrDefault(emptyList())
