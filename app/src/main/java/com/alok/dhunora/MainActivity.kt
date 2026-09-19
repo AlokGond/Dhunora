@@ -3885,7 +3885,8 @@ private fun SettingsScreen(
                 Text(
                     "Settings",
                     fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
                 )
             }
 
@@ -3993,7 +3994,8 @@ private fun SettingsScreen(
                 "Dhunora",
                 Modifier.padding(horizontal = 28.dp),
                 fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
             )
             Text(
                 "Developer: Alok",
@@ -4011,7 +4013,8 @@ private fun SettingsSectionTitle(title: String) {
         title,
         Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
         fontSize = 23.sp,
-        fontWeight = FontWeight.ExtraBold
+        fontWeight = FontWeight.ExtraBold,
+        color = Color.White
     )
 }
 
@@ -4030,7 +4033,8 @@ private fun SettingsValueRow(
         Text(
             title,
             fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White
         )
         Spacer(Modifier.height(5.dp))
         Text(
@@ -4059,7 +4063,8 @@ private fun SettingsToggleRow(
                 title,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
-                lineHeight = 24.sp
+                lineHeight = 24.sp,
+                color = Color.White
             )
             Spacer(Modifier.height(5.dp))
             Text(
