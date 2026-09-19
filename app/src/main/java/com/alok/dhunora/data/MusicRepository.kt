@@ -74,14 +74,21 @@ object MusicRepository {
                                     }.getOrDefault(emptyList())
                                 }
 
-                            (
-                                musicJob.await() +
+                            val music =
+                                musicJob.await()
+                                    .sortedByDescending { scoreSongResult(clean, it) }
+
+                            val fallback =
+                                (
                                     generalJob.await() +
-                                    audioJob.await() +
-                                    songJob.await()
-                            )
+                                        audioJob.await() +
+                                        songJob.await()
+                                )
+                                    .distinctBy { it.sourceUrl }
+                                    .sortedByDescending { scoreSongResult(clean, it) }
+
+                            (music + fallback)
                                 .distinctBy { it.sourceUrl }
-                                .sortedByDescending { scoreSongResult(clean, it) }
                                 .take(50)
                         }
 
@@ -148,7 +155,7 @@ object MusicRepository {
                     subtitle = item.uploaderName ?: "Unknown artist",
                     sourceUrl = item.url,
                     thumbnailUrl =
-                        youtubeThumbnail(item.url) ?: bestThumbnail(item.thumbnails),
+                        bestThumbnail(item.thumbnails) ?: youtubeThumbnail(item.url),
                     durationSeconds = item.duration.coerceAtLeast(0)
                 )
             }
@@ -200,7 +207,7 @@ object MusicRepository {
                     title = name,
                     subtitle = uploaderName ?: "Unknown artist",
                     sourceUrl = url,
-                    thumbnailUrl = youtubeThumbnail(url) ?: bestThumbnail(thumbnails),
+                    thumbnailUrl = bestThumbnail(thumbnails) ?: youtubeThumbnail(url),
                     durationSeconds = duration.coerceAtLeast(0)
                 )
             }
@@ -256,7 +263,7 @@ object MusicRepository {
                                 sourceUrl = item.url,
                                 durationSeconds = item.duration.coerceAtLeast(0),
                                 thumbnailUrl =
-                                    youtubeThumbnail(item.url) ?: bestThumbnail(item.thumbnails)
+                                    bestThumbnail(item.thumbnails) ?: youtubeThumbnail(item.url)
                             )
                         }
                         .filter { candidate ->
