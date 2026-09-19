@@ -15,6 +15,8 @@ object AccountSession {
     private const val KEY_COOKIE = "youtube_music_cookie"
     private const val KEY_IV = "youtube_music_cookie_iv"
     private const val KEY_ALIAS = "DhunoraYouTubeSessionKey"
+    private const val KEY_PROFILE_NAME = "youtube_profile_name"
+    private const val KEY_PROFILE_AVATAR = "youtube_profile_avatar"
 
     fun saveCookie(context: Context, cookie: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -45,6 +47,28 @@ object AccountSession {
             String(cipher.doFinal(encrypted), Charsets.UTF_8)
         }.getOrDefault("")
     }
+
+    fun saveProfile(
+        context: Context,
+        name: String?,
+        avatarUrl: String?
+    ) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_PROFILE_NAME, name.orEmpty())
+            .putString(KEY_PROFILE_AVATAR, avatarUrl.orEmpty())
+            .apply()
+    }
+
+    fun profileName(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PROFILE_NAME, "")
+            .orEmpty()
+
+    fun profileAvatar(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PROFILE_AVATAR, "")
+            .orEmpty()
 
     fun isLoggedIn(context: Context): Boolean {
         val value = cookie(context)
