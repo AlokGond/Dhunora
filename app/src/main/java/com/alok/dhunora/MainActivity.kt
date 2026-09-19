@@ -165,6 +165,7 @@ import com.alok.dhunora.model.MusicSearchItem
 import com.alok.dhunora.model.SearchKind
 import com.alok.dhunora.model.Song
 import com.alok.dhunora.player.PlaybackService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -316,6 +317,7 @@ class MainActivity : ComponentActivity() {
         var madeForYou by remember { mutableStateOf<List<Song>>(emptyList()) }
         var trending by remember { mutableStateOf<List<Song>>(emptyList()) }
         var loadingSearch by remember { mutableStateOf(false) }
+        var searchRequestId by remember { mutableLongStateOf(0L) }
         var loadingHome by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
         var currentSong by remember { mutableStateOf<Song?>(null) }
@@ -650,30 +652,59 @@ class MainActivity : ComponentActivity() {
         }
 
         fun runSearch(term: String = searchText, kind: SearchKind = selectedSearchKind) {
-            if (term.isBlank()) return
+            val clean = term.trim()
+            if (clean.isBlank()) return
+
             searchText = term
             selectedSearchKind = kind
             selectedTab = MainTab.SEARCH
-            loadingSearch = true
             error = null
+
+            searchRequestId += 1L
+            val requestId = searchRequestId
+
             searchJob?.cancel()
+            loadingSearch = true
+
             searchJob =
                 lifecycleScope.launch {
                     try {
-                        runCatching { MusicRepository.search(term.trim(), kind) }
-                            .onSuccess {
-                                searchResults = it
-                                if (kind == SearchKind.SONG) {
-                                    val likelyNext =
-                                        it.mapNotNull { result -> result.toSongOrNull() }.take(2)
-                                    lifecycleScope.launch {
-                                        MusicRepository.prefetchAudioUrls(likelyNext)
-                                    }
+                        val results = MusicRepository.search(clean, kind)
+
+                        if (requestId == searchRequestId) {
+                            searchResults = results
+                            error = null
+
+                            if (kind == SearchKind.SONG) {
+                                val likelyNext =
+                                    results
+                                        .mapNotNull { result -> result.toSongOrNull() }
+                                        .take(3)
+
+                                lifecycleScope.launch {
+                                    MusicRepository.prefetchAudioUrls(likelyNext)
                                 }
                             }
-                            .onFailure { error = it.message ?: "Search failed" }
+                        }
+                    } catch (_: CancellationException) {
+                        // Realtime typing intentionally cancels the previous request.
+                    } catch (t: Throwable) {
+                        if (requestId == searchRequestId) {
+                            val message = t.message.orEmpty()
+                            error =
+                                if (
+                                    message.contains("cancel", ignoreCase = true) ||
+                                    message.contains("StandaloneCoroutine", ignoreCase = true)
+                                ) {
+                                    null
+                                } else {
+                                    message.ifBlank { "Search failed" }
+                                }
+                        }
                     } finally {
-                        loadingSearch = false
+                        if (requestId == searchRequestId) {
+                            loadingSearch = false
+                        }
                     }
                 }
         }
@@ -1809,15 +1840,20 @@ private fun SearchScreen(
             }
         }
 
-        error?.let {
-            item {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
-                )
+        error
+            ?.takeUnless {
+                it.contains("cancel", ignoreCase = true) ||
+                    it.contains("StandaloneCoroutine", ignoreCase = true)
             }
-        }
+            ?.let {
+                item {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
+                    )
+                }
+            }
 
         if (!loading && text.isBlank() && results.isEmpty()) {
             item {
@@ -2053,7 +2089,7 @@ private fun SearchArtwork(
     ) {
         if (!item.thumbnailUrl.isNullOrBlank()) {
             AsyncImage(
-                model = item.thumbnailUrl,
+                model = MusicRepository.highQualityThumbnail(item.thumbnailUrl),
                 contentDescription = item.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -2132,11 +2168,11 @@ private fun CollectionDetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ArrowBack, "Back")
+                    Icon(Icons.Rounded.ArrowBack, "Back", tint = Color.White)
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = {}) {
-                    Icon(Icons.Rounded.MoreVert, null)
+                    Icon(Icons.Rounded.MoreVert, null, tint = Color.White)
                 }
             }
 
@@ -2158,6 +2194,7 @@ private fun CollectionDetailScreen(
 
                 Text(
                     item.title,
+                    color = Color.White,
                     fontSize = 27.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 2,
@@ -2173,7 +2210,7 @@ private fun CollectionDetailScreen(
                         SearchKind.PLAYLIST -> "Playlist • " + item.subtitle
                         SearchKind.SONG -> item.subtitle
                     },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.72f),
                     fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -3632,7 +3669,7 @@ private fun SongListRow(song: Song, favorite: Boolean, onPlay: () -> Unit, onFav
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
