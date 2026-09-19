@@ -5,5 +5,6 @@ data class Song(
     val artist: String,
     val sourceUrl: String,
     val durationSeconds: Long = 0,
-    val thumbnailUrl: String? = null
+    val thumbnailUrl: String? = null,
+    val localUri: String? = null
 )
