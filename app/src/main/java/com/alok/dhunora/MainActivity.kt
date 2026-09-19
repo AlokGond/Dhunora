@@ -309,7 +309,7 @@ class MainActivity : ComponentActivity() {
         var isPlaying by remember { mutableStateOf(false) }
         var buffering by remember { mutableStateOf(false) }
         var playerExpanded by rememberSaveable { mutableStateOf(false) }
-        var playerPane by rememberSaveable { mutableStateOf(PlayerPane.UP_NEXT) }
+        var playerPane by rememberSaveable { mutableStateOf(PlayerPane.LYRICS) }
         var favorites by remember { mutableStateOf(loadFavorites()) }
         var recentSongs by remember { mutableStateOf(ListeningProfileStore.recent(this@MainActivity)) }
         var playbackQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -2908,11 +2908,11 @@ private fun NowPlayingScreen(
     LaunchedEffect(fraction) { dragging = fraction }
 
     val topColor =
-        if (style == "Immersive") Color(0xFF4A1730)
-        else Color(0xFF3D1735)
+        if (style == "Immersive") Color(0xFFC41434)
+        else Color(0xFF8F132B)
     val midColor =
-        if (liquidGlass) Color(0xFF231316)
-        else Color(0xFF171116)
+        if (liquidGlass) Color(0xFF351519)
+        else Color(0xFF211316)
 
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         LazyColumn(
@@ -2968,18 +2968,18 @@ private fun NowPlayingScreen(
                     }
                 }
 
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(34.dp))
 
                 Artwork(
                     song,
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 26.dp)
+                        .padding(horizontal = 40.dp)
                         .aspectRatio(1f),
                     12.dp
                 )
 
-                Spacer(Modifier.height(44.dp))
+                Spacer(Modifier.height(38.dp))
 
                 Column(Modifier.padding(horizontal = 24.dp)) {
                     Row(
@@ -3185,23 +3185,17 @@ private fun PlayerActionIcon(
     label: String,
     onClick: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
-            .width(72.dp)
-            .clickable(onClick = onClick)
-            .padding(vertical = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .size(56.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
             icon,
             contentDescription = label,
-            modifier = Modifier.size(27.dp)
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = Color.White.copy(alpha = 0.65f)
+            modifier = Modifier.size(29.dp),
+            tint = Color.White
         )
     }
 }
@@ -4114,7 +4108,8 @@ private fun formatDuration(seconds: Long): String {
 }
 
 private fun formatTime(ms: Long): String {
-    val total = (ms.coerceAtLeast(0L) / 1000)
+    if (ms <= 1L || ms == Long.MIN_VALUE || ms < 0L) return "--:--"
+    val total = ms / 1000
     val m = total / 60
     val s = total % 60
     return m.toString() + ":" + s.toString().padStart(2, '0')
