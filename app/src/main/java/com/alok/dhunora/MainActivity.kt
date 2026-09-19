@@ -12,7 +12,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -2237,7 +2236,6 @@ private fun SongActionSheet(
     Column(
         Modifier
             .fillMaxWidth()
-            .animateContentSize()
             .padding(bottom = 26.dp)
     ) {
         Row(
