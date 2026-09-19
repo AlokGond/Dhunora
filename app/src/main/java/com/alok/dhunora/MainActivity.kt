@@ -3790,29 +3790,238 @@ private fun AccountSheet(
 }
 
 @Composable
-private fun SettingsSheet(
+private fun SettingsScreen(
     youtubeLoggedIn: Boolean,
-    onAccount: () -> Unit
+    translucentNav: Boolean,
+    liquidGlass: Boolean,
+    romanizedLyrics: Boolean,
+    nowPlayingStyle: String,
+    lyricsStyle: String,
+    themeColor: String,
+    onBack: () -> Unit,
+    onAccount: () -> Unit,
+    onTranslucentNav: (Boolean) -> Unit,
+    onLiquidGlass: (Boolean) -> Unit,
+    onRomanizedLyrics: (Boolean) -> Unit,
+    onNowPlayingStyle: (String) -> Unit,
+    onLyricsStyle: (String) -> Unit,
+    onThemeColor: (String) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 36.dp)) {
-        Text("Dhunora", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-        Text("by Alok", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(20.dp))
-        SettingRow(
-            Icons.Rounded.Person,
-            if (youtubeLoggedIn) "YouTube Music connected" else "Connect YouTube Music",
-            if (youtubeLoggedIn) "Liked music sync is enabled" else "Sign in with your Google account",
-            onClick = onAccount
-        )
-        SettingRow(Icons.Rounded.Tune, "Interface", "SimpMusic-inspired floating navigation")
-        SettingRow(Icons.Rounded.MusicNote, "Playback", "YouTube / YouTube Music stream resolver")
-        SettingRow(Icons.Rounded.Favorite, "Library", "Likes are saved locally on your phone")
-        HorizontalDivider(Modifier.padding(vertical = 14.dp))
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 36.dp)
+    ) {
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Rounded.ArrowBack,
+                        "Back",
+                        modifier = Modifier.size(31.dp)
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Settings",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+
+            Spacer(Modifier.height(26.dp))
+
+            SettingsSectionTitle("Interface")
+
+            SettingsValueRow(
+                title = "Theme",
+                value = "Dark",
+                onClick = {}
+            )
+
+            SettingsValueRow(
+                title = "Now Playing style",
+                value = nowPlayingStyle,
+                onClick = {
+                    onNowPlayingStyle(
+                        if (nowPlayingStyle == "Classic") "Immersive"
+                        else "Classic"
+                    )
+                }
+            )
+
+            SettingsValueRow(
+                title = "Lyrics style",
+                value = lyricsStyle,
+                onClick = {
+                    onLyricsStyle(
+                        if (lyricsStyle == "Classic") "Card"
+                        else "Classic"
+                    )
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Lyrics romanization",
+                subtitle = "Show lyrics in Latin script when supported",
+                checked = romanizedLyrics,
+                onChecked = onRomanizedLyrics
+            )
+
+            SettingsValueRow(
+                title = "Theme color",
+                value = themeColor,
+                onClick = {
+                    onThemeColor(
+                        when (themeColor) {
+                            "Default" -> "Purple"
+                            "Purple" -> "Red"
+                            else -> "Default"
+                        }
+                    )
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Translucent bottom navigation bar",
+                subtitle = "Show content through the bottom navigation surface",
+                checked = translucentNav,
+                onChecked = onTranslucentNav
+            )
+
+            SettingsToggleRow(
+                title = "Enable liquid glass (BETA)",
+                subtitle = "Use glass-like translucent player and navigation surfaces",
+                checked = liquidGlass,
+                onChecked = onLiquidGlass
+            )
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSectionTitle("Content")
+
+            SettingsValueRow(
+                title = "YouTube Account",
+                value =
+                    if (youtubeLoggedIn)
+                        "Connected"
+                    else
+                        "Not connected",
+                onClick = onAccount
+            )
+
+            SettingsValueRow(
+                title = "Language",
+                value = "English",
+                onClick = {}
+            )
+
+            SettingsValueRow(
+                title = "Content country",
+                value = "India",
+                onClick = {}
+            )
+
+            SettingsValueRow(
+                title = "Playback source",
+                value = "YouTube Music / YouTube",
+                onClick = {}
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                "Dhunora",
+                Modifier.padding(horizontal = 28.dp),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                "Developer: Alok",
+                Modifier.padding(horizontal = 28.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(title: String) {
+    Text(
+        title,
+        Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
+        fontSize = 23.sp,
+        fontWeight = FontWeight.ExtraBold
+    )
+}
+
+@Composable
+private fun SettingsValueRow(
+    title: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 72.dp, vertical = 14.dp)
+    ) {
         Text(
-            "Dhunora is an independent open-source client. It is not affiliated with Google, YouTube or SimpMusic.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-            lineHeight = 18.sp
+            title,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            value,
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onChecked: (Boolean) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 72.dp, end = 28.dp, top = 13.dp, bottom = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                lineHeight = 24.sp
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                subtitle,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onChecked
         )
     }
 }
