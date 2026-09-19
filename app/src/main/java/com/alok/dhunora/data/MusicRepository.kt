@@ -662,43 +662,17 @@ object MusicRepository {
     }
 
     fun artworkFor(song: Song): String? =
-        highQualityThumbnail(
+        upgradeThumbnailUrl(
             song.thumbnailUrl?.takeIf { it.isNotBlank() }
                 ?: youtubeThumbnail(song.sourceUrl)
         )
 
-    fun highQualityThumbnail(url: String?): String? {
-        if (url.isNullOrBlank()) return null
+    fun highQualityThumbnail(url: String?): String? =
+        upgradeThumbnailUrl(url)
 
-        var upgraded = url
-
-        if (
-            upgraded.contains("googleusercontent.com") ||
-            upgraded.contains("ggpht.com") ||
-            upgraded.contains("yt3.ggpht.com")
-        ) {
-            upgraded =
-                upgraded
-                    .replace(Regex("w\\d+-h\\d+"), "w800-h800")
-                    .replace(Regex("=s\\d+(-c)?"), "=s800-c")
-        }
-
-        if (upgraded.contains("i.ytimg.com/vi/")) {
-            val id =
-                Regex("/vi/([A-Za-z0-9_-]{11})/")
-                    .find(upgraded)
-                    ?.groupValues
-                    ?.getOrNull(1)
-
-            if (!id.isNullOrBlank()) {
-                upgraded = "https://i.ytimg.com/vi/$id/hq720.jpg"
-            }
-        }
-
-        return upgraded
-    }
-
-    private fun bestThumbnail(images: List<org.schabi.newpipe.extractor.Image>): String? =
+    private fun bestThumbnail(
+        images: List<org.schabi.newpipe.extractor.Image>
+    ): String? =
         images
             .filter { it.url.isNotBlank() }
             .maxByOrNull { image ->
@@ -715,35 +689,48 @@ object MusicRepository {
                 url.contains("ggpht.com") ||
                 url.contains("yt3.")
 
-        return when {
-            googleLike && Regex("=w\\d+-h\\d+").containsMatchIn(url) ->
-                url.replace(
-                    Regex("=w\\d+-h\\d+[^?]*$"),
-                    "=w1200-h1200-l90-rj"
-                )
+        if (googleLike) {
+            var upgraded = url
+                .replace(Regex("w\\d+-h\\d+"), "w1200-h1200")
+                .replace(Regex("=s\\d+(-c)?"), "=s1200-c")
 
-            googleLike && Regex("w\\d+-h\\d+").containsMatchIn(url) ->
-                url.replace(Regex("w\\d+-h\\d+"), "w1200-h1200")
+            if (
+                Regex("=w\\d+-h\\d+").containsMatchIn(upgraded)
+            ) {
+                upgraded =
+                    upgraded.replace(
+                        Regex("=w\\d+-h\\d+[^?]*$"),
+                        "=w1200-h1200-l90-rj"
+                    )
+            }
 
-            url.contains("i.ytimg.com/vi/") ->
-                url.replace(
-                    Regex("/(default|mqdefault|hqdefault|sddefault|maxresdefault)\\.jpg.*$"),
-                    "/sddefault.jpg"
-                )
-
-            else -> url
+            return upgraded
         }
+
+        if (url.contains("i.ytimg.com/vi/")) {
+            val id =
+                Regex("/vi/([A-Za-z0-9_-]{11})/")
+                    .find(url)
+                    ?.groupValues
+                    ?.getOrNull(1)
+
+            if (!id.isNullOrBlank()) {
+                return "https://i.ytimg.com/vi/$id/sddefault.jpg"
+            }
+        }
+
+        return url
     }
-            ?.let(::highQualityThumbnail)
 
     private fun youtubeThumbnail(url: String): String? {
-        val id = Regex("(?:v=|youtu\\.be/|shorts/)([A-Za-z0-9_-]{11})")
-            .find(url)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: return null
+        val id =
+            Regex("(?:v=|youtu\\.be/|shorts/)([A-Za-z0-9_-]{11})")
+                .find(url)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?: return null
 
-        return "https://i.ytimg.com/vi/" + id + "/hq720.jpg"
+        return "https://i.ytimg.com/vi/$id/sddefault.jpg"
     }
 
     private fun formatCount(value: Long): String =
