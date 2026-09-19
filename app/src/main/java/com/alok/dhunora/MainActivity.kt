@@ -1173,6 +1173,8 @@ private fun HomeScreen(
     onFavorite: (Song) -> Unit,
     favoriteCheck: (Song) -> Boolean,
     youtubeLoggedIn: Boolean,
+    profileName: String,
+    profileAvatar: String,
     onAccount: () -> Unit,
     onSearch: () -> Unit,
     onHistory: () -> Unit,
@@ -1279,7 +1281,8 @@ private fun HomeScreen(
                         Text(
                             "Welcome back,",
                             fontSize = 19.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
                         )
                         Spacer(Modifier.height(10.dp))
                         Row(
@@ -1287,27 +1290,39 @@ private fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                Modifier.size(54.dp),
+                                Modifier.size(58.dp),
                                 shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 border = BorderStroke(
                                     1.dp,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                                 )
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Rounded.Person,
-                                        null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
+                                    if (profileAvatar.isNotBlank()) {
+                                        AsyncImage(
+                                            model = profileAvatar,
+                                            contentDescription = profileName,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Rounded.Person,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
                             Spacer(Modifier.width(14.dp))
                             Text(
-                                "Your YouTube Music",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                profileName.ifBlank { "YouTube Music" },
+                                fontSize = 25.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         Spacer(Modifier.height(28.dp))
@@ -3756,6 +3771,8 @@ private fun ActionRow(
 
 @Composable
 private fun AccountSheet(
+    profileName: String,
+    profileAvatar: String,
     likedCount: Int,
     onOpenLiked: () -> Unit,
     onLogout: () -> Unit
@@ -3773,23 +3790,32 @@ private fun AccountSheet(
             Surface(
                 Modifier.size(54.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "Y",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 22.sp
-                    )
+                    if (profileAvatar.isNotBlank()) {
+                        AsyncImage(
+                            model = profileAvatar,
+                            contentDescription = profileName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            Icons.Rounded.Person,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             Spacer(Modifier.width(14.dp))
             Column {
                 Text(
-                    "YouTube Music connected",
+                    profileName.ifBlank { "YouTube Music connected" },
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
                 )
                 Text(
                     likedCount.toString() + " liked songs synced",
