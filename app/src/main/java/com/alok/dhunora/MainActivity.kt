@@ -1590,6 +1590,7 @@ private fun LibraryScreen(
     youtubeLoggedIn: Boolean,
     youtubeLoading: Boolean,
     myPlaylist: List<Song>,
+    downloads: List<DownloadRecord>,
     onPlay: (Song) -> Unit,
     onFavorite: (Song) -> Unit,
     onSearch: () -> Unit,
@@ -1678,6 +1679,18 @@ private fun LibraryScreen(
                 onClick = { myPlaylist.firstOrNull()?.let(onPlay) }
             )
             LibraryHeroCard(
+                title = "Downloads",
+                subtitle =
+                    downloads.count { it.isComplete }.toString() +
+                        " ready • " +
+                        downloads.count { !it.isComplete }.toString() +
+                        " active",
+                icon = Icons.Rounded.Download,
+                onClick = {
+                    downloads.firstOrNull { it.isComplete }?.song?.let(onPlay)
+                }
+            )
+            LibraryHeroCard(
                 title = "Recently played",
                 subtitle = recent.size.toString() + " items",
                 icon = Icons.Rounded.History,
@@ -1696,6 +1709,30 @@ private fun LibraryScreen(
                 fontSize = 23.sp,
                 fontWeight = FontWeight.ExtraBold
             )
+        }
+
+        if (downloads.isNotEmpty()) {
+            item {
+                Text(
+                    "Downloads",
+                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            items(
+                items = downloads,
+                key = { "download:" + it.id }
+            ) { record ->
+                DownloadRow(
+                    record = record,
+                    onPlay = {
+                        if (record.isComplete) {
+                            onPlay(record.song)
+                        }
+                    }
+                )
+            }
         }
 
         if (recent.isEmpty()) {
@@ -1777,6 +1814,69 @@ private fun LibraryScreen(
                 SongListRow(song, true, { onPlay(song) }, { onFavorite(song) })
             }
         }
+    }
+}
+
+@Composable
+private fun DownloadRow(
+    record: DownloadRecord,
+    onPlay: () -> Unit
+) {
+    val statusText =
+        when (record.status) {
+            DownloadManager.STATUS_SUCCESSFUL -> "Downloaded"
+            DownloadManager.STATUS_RUNNING -> "Downloading • " + record.progress + "%"
+            DownloadManager.STATUS_PAUSED -> "Paused • " + record.progress + "%"
+            DownloadManager.STATUS_FAILED -> "Download failed"
+            else -> "Waiting to download"
+        }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = record.isComplete, onClick = onPlay)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Artwork(record.song, Modifier.size(58.dp), 10.dp)
+        Spacer(Modifier.width(12.dp))
+
+        Column(Modifier.weight(1f)) {
+            Text(
+                record.song.title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                record.song.artist + " • " + statusText,
+                fontSize = 12.sp,
+                color =
+                    if (record.status == DownloadManager.STATUS_FAILED)
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (!record.isComplete && record.status != DownloadManager.STATUS_FAILED) {
+                Spacer(Modifier.height(5.dp))
+                LinearProgressIndicator(
+                    progress = { record.progress / 100f },
+                    modifier = Modifier.fillMaxWidth().height(2.dp)
+                )
+            }
+        }
+
+        Icon(
+            if (record.isComplete) Icons.Rounded.PlayArrow else Icons.Rounded.Download,
+            contentDescription = null,
+            tint =
+                if (record.isComplete) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
