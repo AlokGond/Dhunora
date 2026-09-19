@@ -8,6 +8,8 @@
         android:name=".DhunoraApplication"
         android:allowBackup="true"
         android:label="Dhunora"
+        android:icon="@drawable/ic_dhunora_launcher"
+        android:roundIcon="@drawable/ic_dhunora_launcher"
         android:theme="@style/Theme.Dhunora"
         android:usesCleartextTraffic="false">
         <activity
