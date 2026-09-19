@@ -261,6 +261,11 @@ class MainActivity : ComponentActivity() {
         var playbackQueue by remember { mutableStateOf<List<Song>>(emptyList()) }
         var selectedMood by rememberSaveable { mutableStateOf("All") }
         var showSettings by remember { mutableStateOf(false) }
+        var showSongMenu by remember { mutableStateOf(false) }
+        var showAccountSheet by remember { mutableStateOf(false) }
+        var youtubeLoggedIn by remember { mutableStateOf(AccountSession.isLoggedIn(this@MainActivity)) }
+        var youtubeLikedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+        var youtubeLikedLoading by remember { mutableStateOf(false) }
         var positionMs by remember { mutableLongStateOf(0L) }
         var durationMs by remember { mutableLongStateOf(1L) }
 
@@ -274,6 +279,23 @@ class MainActivity : ComponentActivity() {
             surfaceVariant = Color(0xFF1B1A21),
             onSurfaceVariant = Color(0xFFC8C3D2)
         )
+
+        val loginLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) {
+                youtubeLoggedIn = AccountSession.isLoggedIn(this@MainActivity)
+            }
+
+        fun openAccount() {
+            if (youtubeLoggedIn) {
+                showAccountSheet = true
+            } else {
+                loginLauncher.launch(
+                    Intent(this@MainActivity, LoginActivity::class.java)
+                )
+            }
+        }
 
         fun isFavorite(song: Song): Boolean = favorites.any { it.sourceUrl == song.sourceUrl }
 
@@ -450,6 +472,19 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        LaunchedEffect(youtubeLoggedIn) {
+            if (youtubeLoggedIn) {
+                youtubeLikedLoading = true
+                youtubeLikedSongs =
+                    runCatching { MusicRepository.loadYouTubeLikedMusic() }
+                        .getOrDefault(emptyList())
+                youtubeLikedLoading = false
+            } else {
+                youtubeLikedSongs = emptyList()
+                youtubeLikedLoading = false
+            }
+        }
+
         LaunchedEffect(Unit) {
             loadingHome = true
             val songs = runCatching {
@@ -532,7 +567,7 @@ class MainActivity : ComponentActivity() {
                         durationMs = durationMs,
                         favorite = isFavorite(currentSong!!),
                         pane = playerPane,
-                        queue = (quickPicks + madeForYou).distinctBy { it.sourceUrl },
+                        queue = playbackQueue.ifEmpty { (quickPicks + madeForYou).distinctBy { it.sourceUrl } },
                         onCollapse = { playerExpanded = false },
                         onTogglePlay = {
                             if (player.isPlaying) player.pause() else player.play()
@@ -542,6 +577,7 @@ class MainActivity : ComponentActivity() {
                             player.seekTo((durationMs * fraction.coerceIn(0f, 1f)).toLong())
                         },
                         onFavorite = { toggleFavorite(currentSong!!) },
+                        onMore = { showSongMenu = true },
                         onPrevious = { playPrevious() },
                         onNext = { playNext() },
                         onPane = { playerPane = it },
@@ -618,15 +654,22 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpen = { openSearchResult(it) },
                                 onFavorite = { song -> toggleFavorite(song) },
-                                favoriteCheck = { song -> isFavorite(song) }
+                                favoriteCheck = { song -> isFavorite(song) },
+                                accountConnected = youtubeLoggedIn,
+                                onAccount = { openAccount() }
                             )
                             MainTab.LIBRARY -> LibraryScreen(
                                 modifier = Modifier.padding(padding),
                                 favorites = favorites,
                                 recent = recentSongs,
+                                youtubeLiked = youtubeLikedSongs,
+                                youtubeLoggedIn = youtubeLoggedIn,
+                                youtubeLoading = youtubeLikedLoading,
+                                myPlaylist = LocalPlaylistStore.myPlaylist(this@MainActivity),
                                 onPlay = { playSong(it) },
                                 onFavorite = { toggleFavorite(it) },
-                                onSearch = { selectedTab = MainTab.SEARCH }
+                                onSearch = { selectedTab = MainTab.SEARCH },
+                                onAccount = { openAccount() }
                             )
                         }
                     }
@@ -637,7 +680,125 @@ class MainActivity : ComponentActivity() {
                         onDismissRequest = { showSettings = false },
                         containerColor = MaterialTheme.colorScheme.surface
                     ) {
-                        SettingsSheet()
+                        SettingsSheet(
+                            youtubeLoggedIn = youtubeLoggedIn,
+                            onAccount = {
+                                showSettings = false
+                                openAccount()
+                            }
+                        )
+                    }
+                }
+
+                if (showSongMenu && currentSong != null) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showSongMenu = false },
+                        containerColor = Color(0xFF242424),
+                        dragHandle = {
+                            Surface(
+                                Modifier
+                                    .padding(top = 10.dp, bottom = 8.dp)
+                                    .width(72.dp)
+                                    .height(5.dp),
+                                shape = RoundedCornerShape(100.dp),
+                                color = Color(0xFF5D5D5D)
+                            ) {}
+                        }
+                    ) {
+                        SongActionSheet(
+                            song = currentSong!!,
+                            favorite = isFavorite(currentSong!!),
+                            onLike = { toggleFavorite(currentSong!!) },
+                            onDownload = {
+                                showSongMenu = false
+                                downloadSong(currentSong!!)
+                            },
+                            onAddPlaylist = {
+                                addToMyPlaylist(currentSong!!)
+                                showSongMenu = false
+                            },
+                            onPlayNext = {
+                                val song = currentSong!!
+                                val queue = playbackQueue.ifEmpty { fallbackQueue() }.toMutableList()
+                                val index =
+                                    queue.indexOfFirst { it.sourceUrl == song.sourceUrl }
+                                        .takeIf { it >= 0 } ?: 0
+                                queue.add((index + 1).coerceAtMost(queue.size), song)
+                                playbackQueue = queue
+                                Toast.makeText(this@MainActivity, "Added to play next", Toast.LENGTH_SHORT).show()
+                                showSongMenu = false
+                            },
+                            onAddQueue = {
+                                val song = currentSong!!
+                                playbackQueue =
+                                    (playbackQueue.ifEmpty { fallbackQueue() } + song)
+                                        .distinctBy { it.sourceUrl }
+                                Toast.makeText(this@MainActivity, "Added to queue", Toast.LENGTH_SHORT).show()
+                                showSongMenu = false
+                            },
+                            onArtist = {
+                                val artist = currentSong!!.artist
+                                showSongMenu = false
+                                playerExpanded = false
+                                runSearch(artist, SearchKind.ARTIST)
+                            },
+                            onAlbum = {
+                                val song = currentSong!!
+                                showSongMenu = false
+                                playerExpanded = false
+                                runSearch(song.title + " " + song.artist, SearchKind.ALBUM)
+                            },
+                            onRadio = {
+                                val song = currentSong!!
+                                showSongMenu = false
+                                lifecycleScope.launch {
+                                    val radio =
+                                        runCatching {
+                                            MusicRepository.searchSongs(song.artist + " similar songs")
+                                        }.getOrDefault(emptyList())
+                                    if (radio.isNotEmpty()) {
+                                        playSong(radio.first(), radio)
+                                    }
+                                }
+                            },
+                            onLyrics = {
+                                playerPane = PlayerPane.LYRICS
+                                showSongMenu = false
+                            },
+                            onSleep = { minutes ->
+                                setSleepTimer(minutes)
+                                showSongMenu = false
+                            },
+                            onPlayback = { speed, pitch ->
+                                setPlayback(speed, pitch)
+                            },
+                            onShare = {
+                                shareSong(currentSong!!)
+                                showSongMenu = false
+                            }
+                        )
+                    }
+                }
+
+                if (showAccountSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showAccountSheet = false },
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ) {
+                        AccountSheet(
+                            likedCount = youtubeLikedSongs.size,
+                            onOpenLiked = {
+                                showAccountSheet = false
+                                selectedTab = MainTab.LIBRARY
+                            },
+                            onLogout = {
+                                AccountSession.clear(this@MainActivity)
+                                youtubeLoggedIn = false
+                                youtubeLikedSongs = emptyList()
+                                showAccountSheet = false
+                                Toast.makeText(this@MainActivity, "Signed out", Toast.LENGTH_SHORT).show()
+                            }
+                        )
                     }
                 }
             }
