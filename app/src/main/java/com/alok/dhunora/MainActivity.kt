@@ -1188,6 +1188,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onKindChange = { kind ->
                                     selectedSearchKind = kind
+                                    if (searchCommitted && searchText.isNotBlank()) {
+                                        runSearch(searchText, kind)
+                                    }
                                 },
                                 onOpen = { openSearchResult(it) },
                                 onFavorite = { song -> toggleFavorite(song) },
