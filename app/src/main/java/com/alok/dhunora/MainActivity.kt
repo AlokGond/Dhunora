@@ -80,6 +80,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,6 +106,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
 import com.alok.dhunora.data.MusicRepository
@@ -125,7 +129,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        player = ExoPlayer.Builder(this).build()
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                8_000,
+                25_000,
+                500,
+                1_000
+            )
+            .build()
+        player = ExoPlayer.Builder(this)
+            .setLoadControl(loadControl)
+            .build()
         setContent { DhunoraApp() }
     }
 
@@ -183,62 +197,128 @@ class MainActivity : ComponentActivity() {
             saveFavorites(favorites)
         }
 
-        fun playSong(song: Song, queue: List<Song>? = null) {
-            val fallbackQueue = (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites)
-                .distinctBy { it.sourceUrl }
+        fun fallbackQueue(): List<Song> =
+            (
+                searchResults.mapNotNull { it.toSongOrNull() } +
+                    quickPicks +
+                    madeForYou +
+                    trending +
+                    favorites
+            ).distinctBy { it.sourceUrl }
 
-            playbackQueue =
+        fun prefetchFollowing(song: Song, queue: List<Song>) {
+            if (queue.size <= 1) return
+            val index = queue.indexOfFirst { it.sourceUrl == song.sourceUrl }
+            if (index < 0) return
+
+            val upcoming = buildList {
+                for (step in 1..2) {
+                    add(queue[(index + step) % queue.size])
+                }
+            }.distinctBy { it.sourceUrl }
+
+            lifecycleScope.launch {
+                MusicRepository.prefetchAudioUrls(upcoming)
+            }
+        }
+
+        fun playSong(
+            song: Song,
+            queue: List<Song>? = null,
+            skipAttempts: Int = 0
+        ) {
+            val resolvedQueue =
                 when {
                     !queue.isNullOrEmpty() -> queue.distinctBy { it.sourceUrl }
                     playbackQueue.any { it.sourceUrl == song.sourceUrl } -> playbackQueue
-                    else -> (listOf(song) + fallbackQueue).distinctBy { it.sourceUrl }
+                    else -> (listOf(song) + fallbackQueue()).distinctBy { it.sourceUrl }
                 }
 
-            currentSong = song
-            recentSongs = listOf(song) + recentSongs.filterNot { it.sourceUrl == song.sourceUrl }.take(19)
+            playbackQueue = resolvedQueue
             buffering = true
             error = null
 
             lifecycleScope.launch {
-                runCatching {
-                    val url = MusicRepository.resolveAudioUrl(song)
+                val resolved = runCatching {
+                    MusicRepository.resolveAudioUrl(song)
+                }
+
+                resolved.onSuccess { url ->
+                    currentSong = song
+                    recentSongs =
+                        listOf(song) +
+                            recentSongs
+                                .filterNot { it.sourceUrl == song.sourceUrl }
+                                .take(19)
+
                     player.setMediaItem(MediaItem.fromUri(url))
                     player.prepare()
                     player.play()
-                }.onSuccess {
                     isPlaying = true
+                    buffering = false
+
+                    prefetchFollowing(song, resolvedQueue)
                 }.onFailure {
-                    error = it.message ?: "Playback failed"
-                    isPlaying = false
+                    MusicRepository.invalidateAudioUrl(song)
+
+                    if (resolvedQueue.size > 1 && skipAttempts < resolvedQueue.size - 1) {
+                        val failedIndex =
+                            resolvedQueue.indexOfFirst { it.sourceUrl == song.sourceUrl }
+                                .takeIf { it >= 0 } ?: 0
+                        val nextIndex = (failedIndex + 1) % resolvedQueue.size
+
+                        playSong(
+                            song = resolvedQueue[nextIndex],
+                            queue = resolvedQueue,
+                            skipAttempts = skipAttempts + 1
+                        )
+                    } else {
+                        buffering = false
+                        isPlaying = false
+                        error = "No playable track found in this queue"
+                    }
                 }
-                buffering = false
             }
         }
 
         fun playNext() {
-            val queue = playbackQueue.ifEmpty {
-                (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
-            }
+            val queue = playbackQueue.ifEmpty { fallbackQueue() }
             if (queue.isEmpty()) return
 
-            val currentIndex = currentSong?.let { active ->
-                queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
-            } ?: -1
-            val nextIndex = if (currentIndex < 0) 0 else (currentIndex + 1) % queue.size
-            playSong(queue[nextIndex], queue)
+            val currentIndex =
+                currentSong?.let { active ->
+                    queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
+                } ?: -1
+
+            val nextIndex =
+                if (currentIndex < 0) 0
+                else (currentIndex + 1) % queue.size
+
+            playSong(
+                song = queue[nextIndex],
+                queue = queue,
+                skipAttempts = 0
+            )
         }
 
         fun playPrevious() {
-            val queue = playbackQueue.ifEmpty {
-                (searchResults.mapNotNull { it.toSongOrNull() } + quickPicks + madeForYou + trending + favorites).distinctBy { it.sourceUrl }
-            }
+            val queue = playbackQueue.ifEmpty { fallbackQueue() }
             if (queue.isEmpty()) return
 
-            val currentIndex = currentSong?.let { active ->
-                queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
-            } ?: 0
-            val previousIndex = if (currentIndex <= 0) queue.lastIndex else currentIndex - 1
-            playSong(queue[previousIndex], queue)
+            val currentIndex =
+                currentSong?.let { active ->
+                    queue.indexOfFirst { it.sourceUrl == active.sourceUrl }
+                } ?: 0
+
+            val previousIndex =
+                if (currentIndex <= 0) queue.lastIndex
+                else currentIndex - 1
+
+            playSong(
+                song = queue[previousIndex],
+                queue = queue,
+                skipAttempts = 0
+            )
         }
 
         fun runSearch(term: String = searchText, kind: SearchKind = selectedSearchKind) {
@@ -250,7 +330,15 @@ class MainActivity : ComponentActivity() {
             error = null
             lifecycleScope.launch {
                 runCatching { MusicRepository.search(term.trim(), kind) }
-                    .onSuccess { searchResults = it }
+                    .onSuccess {
+                        searchResults = it
+                        if (kind == SearchKind.SONG) {
+                            val likelyNext = it.mapNotNull { result -> result.toSongOrNull() }.take(2)
+                            lifecycleScope.launch {
+                                MusicRepository.prefetchAudioUrls(likelyNext)
+                            }
+                        }
+                    }
                     .onFailure { error = it.message ?: "Search failed" }
                 loadingSearch = false
             }
@@ -284,6 +372,11 @@ class MainActivity : ComponentActivity() {
             quickPicks = songs.take(12)
             madeForYou = songs.drop(3).take(10)
             trending = songs.reversed().take(10)
+
+            lifecycleScope.launch {
+                MusicRepository.prefetchAudioUrls(songs.take(2))
+            }
+
             loadingHome = false
         }
 
@@ -304,7 +397,30 @@ class MainActivity : ComponentActivity() {
                 positionMs = player.currentPosition.coerceAtLeast(0L)
                 durationMs = player.duration.takeIf { it > 0 } ?: 1L
                 isPlaying = player.isPlaying
-                delay(1000)
+                delay(650)
+            }
+        }
+
+        DisposableEffect(currentSong) {
+            val failedSong = currentSong
+            val listener =
+                object : Player.Listener {
+                    override fun onPlayerError(errorValue: PlaybackException) {
+                        failedSong?.let { MusicRepository.invalidateAudioUrl(it) }
+                        buffering = true
+                        isPlaying = false
+
+                        lifecycleScope.launch {
+                            delay(120)
+                            playNext()
+                        }
+                    }
+                }
+
+            player.addListener(listener)
+
+            onDispose {
+                player.removeListener(listener)
             }
         }
 
