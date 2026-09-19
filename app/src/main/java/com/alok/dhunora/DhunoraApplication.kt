@@ -39,6 +39,6 @@ class DhunoraApplication : Application(), SingletonImageLoader.Factory {
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .crossfade(true)
+            .crossfade(false)
             .build()
 }
