@@ -2037,159 +2037,509 @@ private fun LibraryScreen(
     onPlay: (Song) -> Unit,
     onFavorite: (Song) -> Unit,
     onSearch: () -> Unit,
-    onAccount: () -> Unit
+    onAccount: () -> Unit,
+    onOpenCollection: (
+        title: String,
+        subtitle: String,
+        songs: List<Song>,
+        downloads: List<DownloadRecord>
+    ) -> Unit
 ) {
-    var filter by rememberSaveable { mutableStateOf("Playlists") }
-    val filters = listOf("Playlists", "Songs", "Albums", "Artists")
+    var filter by rememberSaveable { mutableStateOf("Your library") }
+    val filters =
+        buildList {
+            add("Your library")
+            add("Dhunora Charts")
+            if (youtubeLoggedIn) add("Your YouTube Music")
+        }
+
+    val completedDownloads = downloads.filter { it.isComplete }.map { it.song }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = 18.dp)
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(42.dp).clickable(onClick = onAccount),
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clickable(onClick = onAccount),
                     shape = CircleShape,
                     color =
-                        if (youtubeLoggedIn) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
+                        if (youtubeLoggedIn)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
+                    border =
+                        if (youtubeLoggedIn)
+                            BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
+                        else null
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        if (youtubeLoggedIn) {
-                            Text(
-                                "Y",
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Black
-                            )
-                        } else {
-                            Icon(Icons.Rounded.Person, "Account")
-                        }
+                        Icon(
+                            Icons.Rounded.Person,
+                            "Account",
+                            tint =
+                                if (youtubeLoggedIn)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
-                Text("Library", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onSearch) { Icon(Icons.Rounded.Search, null) }
+
+                Spacer(Modifier.width(14.dp))
+
+                Text(
+                    "Library",
+                    fontSize = 31.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+
+                IconButton(onClick = onAccount) {
+                    Icon(Icons.Rounded.Groups, "Account and friends")
+                }
+
+                IconButton(onClick = onSearch) {
+                    Icon(Icons.Rounded.Search, "Search")
+                }
             }
 
             Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                filters.forEach {
+                filters.forEach { item ->
                     FilterChip(
-                        selected = filter == it,
-                        onClick = { filter = it },
-                        label = { Text(it) },
-                        border = null
+                        selected = filter == item,
+                        onClick = { filter = item },
+                        label = {
+                            Text(
+                                item,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = Color.Transparent
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (filter == item)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        )
                     )
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
-            if (youtubeLoggedIn) {
-                LibraryHeroCard(
-                    title = "YouTube Liked Music",
-                    subtitle =
-                        if (youtubeLoading) "Syncing..."
-                        else youtubeLiked.size.toString() + " songs",
-                    icon = Icons.Rounded.Favorite,
-                    onClick = { youtubeLiked.firstOrNull()?.let(onPlay) }
-                )
-            } else {
-                LibraryHeroCard(
-                    title = "Connect YouTube Music",
-                    subtitle = "See your liked music and account library",
-                    icon = Icons.Rounded.Person,
-                    onClick = onAccount
-                )
+            Spacer(Modifier.height(20.dp))
+
+            when (filter) {
+                "Your YouTube Music" -> {
+                    LibraryWideTile(
+                        title = "YouTube Liked Music",
+                        subtitle =
+                            if (youtubeLoading) "Syncing your account..."
+                            else youtubeLiked.size.toString() + " songs",
+                        icon = Icons.Rounded.Favorite,
+                        container = Color(0xFF9B5DE5),
+                        onClick = {
+                            onOpenCollection(
+                                "YouTube Liked Music",
+                                youtubeLiked.size.toString() + " songs",
+                                youtubeLiked,
+                                emptyList()
+                            )
+                        }
+                    )
+                }
+
+                "Dhunora Charts" -> {
+                    LibraryWideTile(
+                        title = "Your Mix",
+                        subtitle = "Based on your recent listening",
+                        icon = Icons.Rounded.TrendingUp,
+                        container = Color(0xFF1FA2FF),
+                        onClick = {
+                            onOpenCollection(
+                                "Your Mix",
+                                "Personalized from your listening",
+                                recent.distinctBy { it.sourceUrl },
+                                emptyList()
+                            )
+                        }
+                    )
+                }
+
+                else -> {
+                    LibraryTileGrid(
+                        favorites = favorites,
+                        recent = recent,
+                        myPlaylist = myPlaylist,
+                        downloads = downloads,
+                        onOpenCollection = onOpenCollection
+                    )
+                }
             }
 
-            LibraryHeroCard(
-                title = "Liked songs",
-                subtitle = favorites.size.toString() + " local likes",
-                icon = Icons.Rounded.Favorite,
-                onClick = { favorites.firstOrNull()?.let(onPlay) }
-            )
-
-            LibraryHeroCard(
-                title = "My Playlist",
-                subtitle = myPlaylist.size.toString() + " songs",
-                icon = Icons.Rounded.PlaylistAdd,
-                onClick = { myPlaylist.firstOrNull()?.let(onPlay) }
-            )
-            LibraryHeroCard(
-                title = "Downloads",
-                subtitle =
-                    downloads.count { it.isComplete }.toString() +
-                        " ready • " +
-                        downloads.count { !it.isComplete }.toString() +
-                        " active",
-                icon = Icons.Rounded.Download,
-                onClick = {
-                    downloads.firstOrNull { it.isComplete }?.song?.let(onPlay)
-                }
-            )
-            LibraryHeroCard(
-                title = "Recently played",
-                subtitle = recent.size.toString() + " items",
-                icon = Icons.Rounded.History,
-                onClick = { recent.firstOrNull()?.let(onPlay) }
-            )
-            LibraryHeroCard(
-                title = "New playlist",
-                subtitle = "Create your own mix",
-                icon = Icons.Rounded.Add,
-                onClick = {}
-            )
+            Spacer(Modifier.height(24.dp))
 
             Text(
-                "Recently played",
-                Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                fontSize = 23.sp,
+                if (filter == "Your YouTube Music") "Your YouTube Music"
+                else "Recently Added",
+                Modifier.padding(horizontal = 20.dp),
+                fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
+            )
+
+            Spacer(Modifier.height(10.dp))
+        }
+
+        val list =
+            when (filter) {
+                "Your YouTube Music" -> youtubeLiked
+                "Dhunora Charts" ->
+                    (recent + favorites)
+                        .distinctBy { it.sourceUrl }
+                else ->
+                    (youtubeLiked.take(1) + recent + favorites + completedDownloads)
+                        .distinctBy { it.sourceUrl }
+            }
+
+        if (list.isEmpty()) {
+            item {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 38.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Rounded.LibraryMusic,
+                        null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Your library is getting ready",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Play, like or download music and it will appear here.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        } else {
+            items(
+                items = list.take(30),
+                key = { "libraryrecent:" + it.sourceUrl }
+            ) { song ->
+                SongListRow(
+                    song = song,
+                    favorite = favorites.any { it.sourceUrl == song.sourceUrl },
+                    onPlay = { onPlay(song) },
+                    onFavorite = { onFavorite(song) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryTileGrid(
+    favorites: List<Song>,
+    recent: List<Song>,
+    myPlaylist: List<Song>,
+    downloads: List<DownloadRecord>,
+    onOpenCollection: (
+        title: String,
+        subtitle: String,
+        songs: List<Song>,
+        downloads: List<DownloadRecord>
+    ) -> Unit
+) {
+    val completed = downloads.filter { it.isComplete }.map { it.song }
+
+    Column(
+        Modifier.padding(horizontal = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            LibraryColorTile(
+                modifier = Modifier.weight(1f),
+                title = "Favorite",
+                icon = Icons.Rounded.Favorite,
+                container = Color(0xFFFF8FB3),
+                onClick = {
+                    onOpenCollection(
+                        "Favorite",
+                        favorites.size.toString() + " liked songs",
+                        favorites,
+                        emptyList()
+                    )
+                }
+            )
+            LibraryColorTile(
+                modifier = Modifier.weight(1f),
+                title = "My Playlist",
+                icon = Icons.Rounded.PlaylistAdd,
+                container = Color(0xFFFFE300),
+                onClick = {
+                    onOpenCollection(
+                        "My Playlist",
+                        myPlaylist.size.toString() + " songs",
+                        myPlaylist,
+                        emptyList()
+                    )
+                }
             )
         }
 
-        if (downloads.isNotEmpty()) {
-            item {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            LibraryColorTile(
+                modifier = Modifier.weight(1f),
+                title = "Most Played",
+                icon = Icons.Rounded.TrendingUp,
+                container = Color(0xFF1BBED1),
+                onClick = {
+                    onOpenCollection(
+                        "Most Played",
+                        recent.size.toString() + " recent tracks",
+                        recent,
+                        emptyList()
+                    )
+                }
+            )
+            LibraryColorTile(
+                modifier = Modifier.weight(1f),
+                title = "Downloaded",
+                icon = Icons.Rounded.Download,
+                container = Color(0xFF13C45B),
+                onClick = {
+                    onOpenCollection(
+                        "Downloaded",
+                        completed.size.toString() + " ready",
+                        completed,
+                        downloads
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryColorTile(
+    modifier: Modifier,
+    title: String,
+    icon: ImageVector,
+    container: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .height(94.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = container
+    ) {
+        Row(
+            Modifier.padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                null,
+                tint = Color.Black,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(Modifier.width(14.dp))
+            Text(
+                title,
+                color = Color.Black,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 2
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryWideTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    container: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = container.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, container.copy(alpha = 0.55f))
+    ) {
+        Row(
+            Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                Modifier.size(58.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = container.copy(alpha = 0.35f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = container)
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "Downloads",
-                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                    fontSize = 23.sp,
+                    title,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
+                Text(
+                    subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
+                )
             }
+            Icon(Icons.Rounded.ChevronRight, null)
+        }
+    }
+}
+
+@Composable
+private fun LibraryCollectionScreen(
+    collection: LibraryCollection,
+    favorites: List<Song>,
+    onBack: () -> Unit,
+    onPlay: (Song) -> Unit,
+    onFavorite: (Song) -> Unit
+) {
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 28.dp)
+    ) {
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Rounded.ArrowBack, "Back")
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        collection.title,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        collection.subtitle,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (collection.songs.isNotEmpty()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        collection.songs.size.toString() + " tracks",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilledIconButton(
+                        onClick = { collection.songs.firstOrNull()?.let(onPlay) },
+                        modifier = Modifier.size(54.dp)
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, "Play all")
+                    }
+                }
+            }
+
+            HorizontalDivider()
+        }
+
+        if (collection.downloads.isNotEmpty()) {
             items(
-                items = downloads,
-                key = { "download:" + it.id }
+                items = collection.downloads,
+                key = { "collectiondownload:" + it.id }
             ) { record ->
                 DownloadRow(
                     record = record,
                     onPlay = {
-                        if (record.isComplete) {
-                            onPlay(record.song)
-                        }
+                        if (record.isComplete) onPlay(record.song)
                     }
                 )
             }
-        }
-
-        if (recent.isEmpty()) {
+        } else if (collection.songs.isEmpty()) {
             item {
-                Text(
-                    "Songs you play will appear here.",
-                    Modifier.padding(horizontal = 18.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 80.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Rounded.MusicNote,
+                        null,
+                        modifier = Modifier.size(54.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Nothing here yet", fontWeight = FontWeight.Bold)
+                }
             }
         } else {
             items(
-                items = recent,
-                key = { "recent:" + it.sourceUrl }
+                items = collection.songs,
+                key = { "collection:" + it.sourceUrl }
             ) { song ->
                 SongListRow(
                     song = song,
@@ -2197,67 +2547,6 @@ private fun LibraryScreen(
                     onPlay = { onPlay(song) },
                     onFavorite = { onFavorite(song) }
                 )
-            }
-        }
-
-        if (youtubeLoggedIn && youtubeLiked.isNotEmpty()) {
-            item {
-                Text(
-                    "YouTube Liked Music",
-                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-            items(
-                items = youtubeLiked.take(20),
-                key = { "yt:" + it.sourceUrl }
-            ) { song ->
-                SongListRow(
-                    song = song,
-                    favorite = true,
-                    onPlay = { onPlay(song) },
-                    onFavorite = { onFavorite(song) }
-                )
-            }
-        }
-
-        if (myPlaylist.isNotEmpty()) {
-            item {
-                Text(
-                    "My Playlist",
-                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-            items(
-                items = myPlaylist.take(20),
-                key = { "localplaylist:" + it.sourceUrl }
-            ) { song ->
-                SongListRow(
-                    song = song,
-                    favorite = favorites.any { it.sourceUrl == song.sourceUrl },
-                    onPlay = { onPlay(song) },
-                    onFavorite = { onFavorite(song) }
-                )
-            }
-        }
-
-        if (favorites.isNotEmpty()) {
-            item {
-                Text(
-                    "Local liked songs",
-                    Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-            items(
-                items = favorites.take(20),
-                key = { "localfav:" + it.sourceUrl }
-            ) { song ->
-                SongListRow(song, true, { onPlay(song) }, { onFavorite(song) })
             }
         }
     }
