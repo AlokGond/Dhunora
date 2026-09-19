@@ -34,6 +34,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Favorite
@@ -620,19 +621,28 @@ private fun HomeScreen(
 private fun SearchScreen(
     modifier: Modifier,
     text: String,
-    results: List<Song>,
+    results: List<MusicSearchItem>,
+    selectedKind: SearchKind,
     loading: Boolean,
     error: String?,
     onText: (String) -> Unit,
-    onSubmit: (String) -> Unit,
-    onPlay: (Song) -> Unit,
+    onSubmit: (String, SearchKind) -> Unit,
+    onKindChange: (SearchKind) -> Unit,
+    onOpen: (MusicSearchItem) -> Unit,
     onFavorite: (Song) -> Unit,
     favoriteCheck: (Song) -> Boolean
 ) {
     val focus = LocalFocusManager.current
-    var filter by rememberSaveable { mutableStateOf("Songs") }
-    val filters = listOf("Songs", "Albums", "Playlists", "Artists")
-    val browse = listOf("Bollywood & Indian", "Punjabi", "Chill", "Workout", "Focus", "Romance", "Party", "Sleep")
+    val browse = listOf(
+        "Bollywood & Indian",
+        "Punjabi",
+        "Chill",
+        "Workout",
+        "Focus",
+        "Romance",
+        "Party",
+        "Sleep"
+    )
 
     LazyColumn(
         modifier = modifier.fillMaxSize().statusBarsPadding(),
@@ -643,7 +653,12 @@ private fun SearchScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Search", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                Text(
+                    "Search",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
@@ -661,17 +676,28 @@ private fun SearchScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                 shape = RoundedCornerShape(28.dp),
                 singleLine = true,
-                placeholder = { Text("Songs, artists, albums, playlists") },
+                placeholder = {
+                    Text(
+                        when (selectedKind) {
+                            SearchKind.SONG -> "Search songs..."
+                            SearchKind.ALBUM -> "Search albums..."
+                            SearchKind.PLAYLIST -> "Search playlists..."
+                            SearchKind.ARTIST -> "Search artists..."
+                        }
+                    )
+                },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = {
                     if (text.isNotEmpty()) {
-                        IconButton(onClick = { onText("") }) { Icon(Icons.Rounded.Clear, null) }
+                        IconButton(onClick = { onText("") }) {
+                            Icon(Icons.Rounded.Clear, null)
+                        }
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     focus.clearFocus()
-                    onSubmit(text)
+                    onSubmit(text, selectedKind)
                 }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -683,23 +709,36 @@ private fun SearchScreen(
 
             Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                filters.forEach {
+                SearchKind.entries.forEach { kind ->
                     FilterChip(
-                        selected = filter == it,
-                        onClick = { filter = it },
-                        label = { Text(it) },
+                        selected = selectedKind == kind,
+                        onClick = { onKindChange(kind) },
+                        label = { Text(kind.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.36f),
+                            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = Color.Transparent
+                        ),
                         border = null
                     )
-                    Spacer(Modifier.width(2.dp))
                 }
             }
         }
 
         if (loading) {
-            item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp)) }
+            item {
+                LinearProgressIndicator(
+                    Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+            }
+            items(5) {
+                SearchResultShimmer(selectedKind)
+            }
         }
 
         error?.let {
@@ -712,15 +751,18 @@ private fun SearchScreen(
             }
         }
 
-        if (text.isBlank() && results.isEmpty()) {
+        if (!loading && text.isBlank() && results.isEmpty()) {
             item {
                 Text(
-                    "Browse all",
+                    "Everything you need",
                     Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                BrowseGrid(browse = browse, onClick = { onSubmit(it) })
+                BrowseGrid(
+                    browse = browse,
+                    onClick = { onSubmit(it, SearchKind.SONG) }
+                )
             }
         } else if (!loading && results.isEmpty() && text.isNotBlank()) {
             item {
@@ -728,26 +770,337 @@ private fun SearchScreen(
                     Modifier.fillMaxWidth().padding(top = 70.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Rounded.Search, null, modifier = Modifier.size(54.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        Icons.Rounded.Search,
+                        null,
+                        modifier = Modifier.size(54.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(Modifier.height(12.dp))
-                    Text("No results found", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("Try another song or artist", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "No " + selectedKind.label.lowercase() + " found",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        "Try another search",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-        } else {
+        } else if (!loading) {
             item {
                 Text(
-                    "Top results",
+                    selectedKind.label,
                     Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
-            items(results) { song ->
+
+            items(
+                items = results,
+                key = { it.kind.name + ":" + it.sourceUrl }
+            ) { item ->
+                SearchResultRow(
+                    item = item,
+                    favorite =
+                        item.toSongOrNull()?.let(favoriteCheck) ?: false,
+                    onClick = { onOpen(item) },
+                    onFavorite = {
+                        item.toSongOrNull()?.let(onFavorite)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultRow(
+    item: MusicSearchItem,
+    favorite: Boolean,
+    onClick: () -> Unit,
+    onFavorite: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SearchArtwork(
+            item = item,
+            modifier = Modifier.size(52.dp)
+        )
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.title,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(3.dp))
+
+            val meta =
+                when (item.kind) {
+                    SearchKind.SONG ->
+                        item.subtitle +
+                            if (item.durationSeconds > 0) " • " + formatDuration(item.durationSeconds) else ""
+
+                    SearchKind.ALBUM ->
+                        "Album" +
+                            if (item.subtitle.isNotBlank()) " • " + item.subtitle else ""
+
+                    SearchKind.PLAYLIST ->
+                        "Playlist" +
+                            if (item.subtitle.isNotBlank()) " • " + item.subtitle else "" +
+                            if (item.itemCount > 0) " • " + item.itemCount + " songs" else ""
+
+                    SearchKind.ARTIST ->
+                        item.subtitle
+                }
+
+            Text(
+                meta,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (item.kind == SearchKind.SONG) {
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    if (favorite) Icons.Rounded.Favorite else Icons.Rounded.MoreVert,
+                    contentDescription = null,
+                    tint =
+                        if (favorite) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchArtwork(
+    item: MusicSearchItem,
+    modifier: Modifier
+) {
+    val shape =
+        if (item.kind == SearchKind.ARTIST) CircleShape
+        else RoundedCornerShape(5.dp)
+
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        if (!item.thumbnailUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = item.thumbnailUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale =
+                    if (item.kind == SearchKind.ARTIST) ContentScale.Crop
+                    else ContentScale.FillWidth
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (item.kind == SearchKind.ARTIST) Icons.Rounded.Person
+                    else Icons.Rounded.MusicNote,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultShimmer(kind: SearchKind) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            Modifier.size(52.dp),
+            shape = if (kind == SearchKind.ARTIST) CircleShape else RoundedCornerShape(5.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {}
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Surface(
+                Modifier.fillMaxWidth(0.72f).height(16.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {}
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                Modifier.fillMaxWidth(0.42f).height(11.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            ) {}
+        }
+    }
+}
+
+@Composable
+private fun CollectionDetailScreen(
+    item: MusicSearchItem,
+    songs: List<Song>,
+    loading: Boolean,
+    currentSong: Song?,
+    isPlaying: Boolean,
+    onBack: () -> Unit,
+    onPlayAll: () -> Unit,
+    onPlaySong: (Song) -> Unit,
+    onFavorite: (Song) -> Unit,
+    favoriteCheck: (Song) -> Boolean
+) {
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 28.dp)
+    ) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Rounded.ArrowBack, "Back")
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = {}) {
+                    Icon(Icons.Rounded.MoreVert, null)
+                }
+            }
+
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SearchArtwork(
+                    item = item,
+                    modifier =
+                        if (item.kind == SearchKind.ARTIST) {
+                            Modifier.size(190.dp)
+                        } else {
+                            Modifier.size(220.dp)
+                        }
+                )
+
+                Spacer(Modifier.height(18.dp))
+
+                Text(
+                    item.title,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(5.dp))
+
+                Text(
+                    when (item.kind) {
+                        SearchKind.ARTIST -> item.subtitle
+                        SearchKind.ALBUM -> "Album • " + item.subtitle
+                        SearchKind.PLAYLIST -> "Playlist • " + item.subtitle
+                        SearchKind.SONG -> item.subtitle
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(18.dp))
+
+                FilledIconButton(
+                    onClick = onPlayAll,
+                    enabled = songs.isNotEmpty(),
+                    modifier = Modifier.size(62.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = "Play all",
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            HorizontalDivider()
+        }
+
+        if (loading) {
+            item {
+                Box(
+                    Modifier.fillMaxWidth().height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (songs.isEmpty()) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "No tracks available",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        "This item may not expose tracks through the current backend.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        } else {
+            item {
+                Text(
+                    if (item.kind == SearchKind.ARTIST) "Popular" else "Tracks",
+                    Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+
+            items(
+                items = songs,
+                key = { it.sourceUrl }
+            ) { song ->
                 SongListRow(
                     song = song,
                     favorite = favoriteCheck(song),
-                    onPlay = { onPlay(song) },
+                    onPlay = { onPlaySong(song) },
                     onFavorite = { onFavorite(song) }
                 )
             }
