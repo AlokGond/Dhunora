@@ -1142,8 +1142,11 @@ private fun HomeScreen(
     onPlay: (Song) -> Unit,
     onFavorite: (Song) -> Unit,
     favoriteCheck: (Song) -> Boolean,
+    youtubeLoggedIn: Boolean,
+    onAccount: () -> Unit,
     onSearch: () -> Unit,
     onHistory: () -> Unit,
+    onNotifications: () -> Unit,
     onSettings: () -> Unit
 ) {
     val greeting = remember {
@@ -1151,118 +1154,361 @@ private fun HomeScreen(
             in 5..11 -> "Good Morning"
             in 12..16 -> "Good Afternoon"
             in 17..21 -> "Good Evening"
-            else -> "Late night listening"
+            else -> "Good Night"
         }
     }
-    val moods = listOf("All", "Relax", "Energize", "Feel good", "Workout", "Commute")
+    val moods = listOf(
+        "All", "Relax", "Sleep", "Energize", "Sad",
+        "Romance", "Feel good", "Workout", "Party", "Commute", "Focus"
+    )
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 18.dp)
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item {
-            Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
+            Column(
+                Modifier
+                    .statusBarsPadding()
+                    .padding(top = 8.dp)
+            ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(greeting, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                        Text("Dhunora", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp)
+                        Text(
+                            "Dhunora",
+                            fontSize = 29.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.8).sp
+                        )
+                        Text(
+                            greeting,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
+                        )
                     }
-                    IconButton(onClick = onHistory) { Icon(Icons.Rounded.History, "History") }
-                    IconButton(onClick = onSettings) { Icon(Icons.Rounded.Settings, "Settings") }
+
+                    IconButton(onClick = onNotifications) {
+                        Icon(Icons.Rounded.Notifications, "Notifications")
+                    }
+                    IconButton(onClick = onHistory) {
+                        Icon(Icons.Rounded.History, "History")
+                    }
+                    IconButton(onClick = onAccount) {
+                        Icon(Icons.Rounded.Groups, "Account")
+                    }
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Rounded.Settings, "Settings")
+                    }
                 }
 
+                Spacer(Modifier.height(16.dp))
+
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(moods) { mood ->
                         FilterChip(
                             selected = selectedMood == mood,
                             onClick = { onMood(mood) },
-                            label = { Text(mood) },
+                            label = {
+                                Text(
+                                    mood,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp
+                                )
+                            },
+                            shape = RoundedCornerShape(22.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                containerColor = Color.Transparent
                             ),
-                            border = null
+                            border = BorderStroke(
+                                1.dp,
+                                if (selectedMood == mood)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                            )
                         )
                     }
                 }
 
-                Spacer(Modifier.height(18.dp))
-                SectionHeader("Quick picks", "START RADIO", onSearch)
+                Spacer(Modifier.height(28.dp))
+
+                if (youtubeLoggedIn) {
+                    Column(
+                        Modifier.padding(horizontal = 20.dp)
+                    ) {
+                        Text(
+                            "Welcome back,",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier.clickable(onClick = onAccount),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                Modifier.size(54.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                                )
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Rounded.Person,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Text(
+                                "Your YouTube Music",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        Spacer(Modifier.height(28.dp))
+                    }
+                }
+
+                Text(
+                    "LET'S START WITH A RADIO",
+                    Modifier.padding(horizontal = 20.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    "Quick picks",
+                    Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    fontSize = 31.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
 
         if (loading && quickPicks.isEmpty()) {
-            item {
-                Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+            items(4) {
+                SearchResultShimmer(SearchKind.SONG)
             }
         } else {
+            items(
+                items = quickPicks.take(5),
+                key = { "homequick:" + it.sourceUrl }
+            ) { song ->
+                HomeQuickPickRow(
+                    song = song,
+                    favorite = favoriteCheck(song),
+                    onPlay = { onPlay(song) },
+                    onFavorite = { onFavorite(song) }
+                )
+            }
+        }
+
+        if (madeForYou.isNotEmpty()) {
             item {
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    "Forgotten favorites",
+                    Modifier.padding(horizontal = 20.dp),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(14.dp))
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    itemsIndexed(quickPicks.chunked(2)) { _, pair ->
-                        Column(
-                            Modifier.width(310.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            pair.forEach { song ->
-                                CompactSongRow(
-                                    song = song,
-                                    favorite = favoriteCheck(song),
-                                    onPlay = { onPlay(song) },
-                                    onFavorite = { onFavorite(song) }
-                                )
-                            }
-                        }
+                    items(
+                        items = madeForYou,
+                        key = { "forgotten:" + it.sourceUrl }
+                    ) { song ->
+                        LargeHomeCard(
+                            song = song,
+                            onClick = { onPlay(song) }
+                        )
                     }
                 }
             }
         }
 
         item {
-            Spacer(Modifier.height(26.dp))
-            SectionHeader("Made for you", "MORE", onSearch)
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            Spacer(Modifier.height(30.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(
-                    items = madeForYou,
-                    key = { "made:" + it.sourceUrl }
-                ) { song ->
-                    SquareSongCard(song = song, onClick = { onPlay(song) })
-                }
+                Text(
+                    "More for you",
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "Explore",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable(onClick = onSearch)
+                        .padding(8.dp)
+                )
             }
         }
 
-        item {
-            Spacer(Modifier.height(28.dp))
-            Text(
-                "Moods & moments",
-                Modifier.padding(horizontal = 18.dp),
-                fontSize = 25.sp,
-                fontWeight = FontWeight.ExtraBold
+        items(
+            items = trending.take(10),
+            key = { "more:" + it.sourceUrl }
+        ) { song ->
+            SongListRow(
+                song = song,
+                favorite = favoriteCheck(song),
+                onPlay = { onPlay(song) },
+                onFavorite = { onFavorite(song) }
             )
-            Spacer(Modifier.height(12.dp))
-            MoodGrid(onMood)
         }
+    }
+}
 
+@Composable
+private fun HomeQuickPickRow(
+    song: Song,
+    favorite: Boolean,
+    onPlay: () -> Unit,
+    onFavorite: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onPlay)
+            .padding(horizontal = 22.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Artwork(song, Modifier.size(58.dp), 7.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                song.artist,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        IconButton(onClick = onFavorite) {
+            Icon(
+                if (favorite) Icons.Rounded.Favorite else Icons.Rounded.MoreVert,
+                contentDescription = null,
+                tint =
+                    if (favorite) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun LargeHomeCard(
+    song: Song,
+    onClick: () -> Unit
+) {
+    Column(
+        Modifier
+            .width(286.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box {
+            Artwork(
+                song,
+                Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                16.dp
+            )
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                color = Color.Black.copy(alpha = 0.55f)
+            ) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(
+                        song.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        song.artist,
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MixScreen(
+    modifier: Modifier,
+    songs: List<Song>,
+    onPlay: (Song) -> Unit,
+    onFavorite: (Song) -> Unit,
+    favoriteCheck: (Song) -> Boolean
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
         item {
-            Spacer(Modifier.height(28.dp))
-            SectionHeader("More for you", "MORE", onSearch)
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Text(
+                    "Mix",
+                    fontSize = 31.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    "An endless radio shaped by what you listen to",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(20.dp))
+            }
         }
 
-        items(trending.take(8)) { song ->
+        items(
+            items = songs.take(30),
+            key = { "mix:" + it.sourceUrl }
+        ) { song ->
             SongListRow(
                 song = song,
                 favorite = favoriteCheck(song),
