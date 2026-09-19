@@ -90,7 +90,7 @@ class LoginActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         factory = { context ->
                             WebView(context).apply {
-                                cookieManager.setAcceptThirdPartyCookies(this, true)
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.databaseEnabled = true
