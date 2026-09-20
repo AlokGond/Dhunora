@@ -3,6 +3,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main, codex/simpmusic-parity]
+    paths-ignore:
+      - '**/*.md'
+      - scripts/smoke-android.py
+      - .github/workflows/verify-release.yml
 concurrency:
   group: dhunora-${{ github.ref }}
   cancel-in-progress: true

@@ -13,7 +13,7 @@ Dhunora now uses the actual SimpMusic Android interface and feature implementati
 Requires JDK 21 and the Android SDK (platform 37.0 and current build tools).
 
 ```sh
-git clone --recurse-submodules https://github.com/AlokGond/Dhunora.git
+git clone --branch codex/simpmusic-parity --recurse-submodules https://github.com/AlokGond/Dhunora.git
 cd Dhunora
 python3 scripts/prepare-upstream.py
 bash scripts/build-release.sh
