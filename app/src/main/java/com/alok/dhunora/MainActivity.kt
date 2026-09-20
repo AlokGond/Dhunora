@@ -102,6 +102,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -134,6 +135,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -394,65 +396,73 @@ class MainActivity : ComponentActivity() {
             onSurfaceVariant = Color(0xFFC8C3D2)
         )
 
+        val dhunoraFont =
+            FontFamily(
+                Font(
+                    resId = R.font.manrope_variable,
+                    weight = FontWeight.Normal
+                )
+            )
+
         val appTypography = Typography(
             displayLarge = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 34.sp,
                 letterSpacing = (-0.5).sp
             ),
             headlineLarge = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 27.sp,
                 letterSpacing = (-0.35).sp
             ),
             headlineMedium = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 23.sp,
                 letterSpacing = (-0.25).sp
             ),
             titleLarge = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 21.sp,
                 letterSpacing = (-0.15).sp
             ),
             titleMedium = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
             ),
             titleSmall = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp
             ),
             bodyLarge = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Normal,
                 fontSize = 15.sp,
                 lineHeight = 21.sp
             ),
             bodyMedium = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Normal,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             ),
             bodySmall = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Normal,
                 fontSize = 12.sp
             ),
             labelLarge = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp
             ),
             labelMedium = TextStyle(
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Medium,
                 fontSize = 12.sp
             )
@@ -1054,6 +1064,7 @@ class MainActivity : ComponentActivity() {
         }
 
         MaterialTheme(colorScheme = colors, typography = appTypography) {
+            ProvideTextStyle(value = appTypography.bodyLarge) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -1404,7 +1415,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
+                }
+}
 
     private fun loadFavorites(): List<Song> {
         val raw = getSharedPreferences("dhunora", 0).getString("favorites", "[]") ?: "[]"
@@ -1499,15 +1511,15 @@ private fun HomeScreen(
                         Image(
                             painter = painterResource(R.drawable.ic_dhunora_launcher),
                             contentDescription = "Dhunora",
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(36.dp)
                         )
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
                                 "Dhunora",
-                                fontSize = 23.sp,
+                                fontSize = 21.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                letterSpacing = (-0.35).sp
+                                letterSpacing = (-0.2).sp
                             )
                             Text(
                                 greeting,
@@ -1573,7 +1585,7 @@ private fun HomeScreen(
                     ) {
                         Text(
                             "Welcome back,",
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White
                         )
@@ -1583,7 +1595,7 @@ private fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                Modifier.size(58.dp),
+                                Modifier.size(50.dp),
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 border = BorderStroke(
@@ -1611,7 +1623,7 @@ private fun HomeScreen(
                             Spacer(Modifier.width(14.dp))
                             Text(
                                 profileName.ifBlank { "YouTube Music" },
-                                fontSize = 21.sp,
+                                fontSize = 19.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color.White,
                                 maxLines = 1,
@@ -1633,7 +1645,7 @@ private fun HomeScreen(
                 Text(
                     "Quick picks",
                     Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    fontSize = 25.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -1663,7 +1675,7 @@ private fun HomeScreen(
                 Text(
                     "Forgotten favorites",
                     Modifier.padding(horizontal = 20.dp),
-                    fontSize = 23.sp,
+                    fontSize = 21.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(14.dp))
@@ -1694,7 +1706,7 @@ private fun HomeScreen(
             ) {
                 Text(
                     "More for you",
-                    fontSize = 23.sp,
+                    fontSize = 21.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
@@ -1737,12 +1749,12 @@ private fun HomeQuickPickRow(
             .padding(horizontal = 22.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Artwork(song, Modifier.size(54.dp), 9.dp)
+        Artwork(song, Modifier.size(52.dp), 10.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
-                fontSize = 15.5.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1775,7 +1787,7 @@ private fun LargeHomeCard(
 ) {
     Column(
         Modifier
-            .width(248.dp)
+            .width(226.dp)
             .clickable(onClick = onClick)
     ) {
         Box {
@@ -1783,7 +1795,7 @@ private fun LargeHomeCard(
                 song,
                 Modifier
                     .fillMaxWidth()
-                    .height(156.dp),
+                    .height(146.dp),
                 16.dp
             )
             Surface(
@@ -1792,11 +1804,11 @@ private fun LargeHomeCard(
                     .fillMaxWidth(),
                 color = Color.Black.copy(alpha = 0.55f)
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                     Text(
                         song.title,
                         color = Color.White,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1831,7 +1843,7 @@ private fun MixScreen(
             Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Text(
                     "Mix",
-                    fontSize = 25.sp,
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
@@ -1900,7 +1912,7 @@ private fun SearchScreen(
             ) {
                 Text(
                     "Search",
-                    fontSize = 27.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
@@ -2084,7 +2096,7 @@ private fun SearchScreen(
                     "Everything you need",
                     Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
                     fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
                 BrowseGrid(
                     browse = browse,
@@ -2124,7 +2136,7 @@ private fun SearchScreen(
                         "Top results",
                         Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                         fontSize = 23.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
@@ -2184,7 +2196,7 @@ private fun SearchScreen(
                             "More songs",
                             Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                             fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -2194,7 +2206,7 @@ private fun SearchScreen(
                         selectedKind.label,
                         Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                         fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -2493,7 +2505,7 @@ private fun CollectionDetailScreen(
                     Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     color = Color.White,
                     fontSize = 23.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -2697,7 +2709,7 @@ private fun LibraryScreen(
                 else "Recently Added",
                 Modifier.padding(horizontal = 20.dp),
                 fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(Modifier.height(10.dp))
@@ -2876,7 +2888,7 @@ private fun LibraryColorTile(
                 title,
                 color = Color.Black,
                 fontSize = 17.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 maxLines = 2
             )
         }
@@ -2918,7 +2930,7 @@ private fun LibraryWideTile(
                 Text(
                     title,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
                     subtitle,
@@ -2968,7 +2980,7 @@ private fun LibraryCollectionScreen(
                         collection.title,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 25.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -3183,7 +3195,7 @@ private fun PlayerAndNavigation(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 currentSong.title,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -3990,7 +4002,7 @@ private fun SectionHeader(title: String, action: String, onAction: () -> Unit) {
         Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         Text(
             action,
             fontSize = 11.sp,
@@ -4053,7 +4065,7 @@ private fun BrowseGrid(browse: List<String>, onClick: (String) -> Unit) {
                         color = color
                     ) {
                         Box(Modifier.fillMaxSize().padding(12.dp)) {
-                            Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, modifier = Modifier.align(Alignment.TopStart))
+                            Text(title, fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.align(Alignment.TopStart))
                             Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.align(Alignment.BottomEnd).size(30.dp), tint = Color.White.copy(alpha = 0.7f))
                         }
                     }
@@ -4127,7 +4139,7 @@ private fun SongActionSheet(
                 Text(
                     song.title,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = Color.White
@@ -4256,7 +4268,7 @@ private fun SheetBackHeader(
             title,
             color = Color.White,
             fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -4347,7 +4359,7 @@ private fun AccountSheet(
                 Text(
                     profileName.ifBlank { "YouTube Music connected" },
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Text(
@@ -4419,7 +4431,7 @@ private fun SettingsScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Settings",
-                    fontSize = 27.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
                 )
@@ -4580,7 +4592,7 @@ private fun SettingsValueRow(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 72.dp, vertical = 14.dp)
+            .padding(horizontal = 28.dp, vertical = 12.dp)
     ) {
         Text(
             title,
@@ -4607,7 +4619,7 @@ private fun SettingsToggleRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 72.dp, end = 28.dp, top = 13.dp, bottom = 13.dp),
+            .padding(start = 28.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
