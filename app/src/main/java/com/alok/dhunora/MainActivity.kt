@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.widget.Toast
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -144,6 +145,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import androidx.palette.graphics.Palette
 import androidx.media3.common.MediaItem
@@ -407,48 +409,48 @@ class MainActivity : ComponentActivity() {
         val appTypography = Typography(
             displayLarge = TextStyle(
                 fontFamily = dhunoraFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                fontSize = 32.sp,
                 letterSpacing = (-0.5).sp
             ),
             headlineLarge = TextStyle(
                 fontFamily = dhunoraFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold,
+                fontSize = 25.sp,
                 letterSpacing = (-0.35).sp
             ),
             headlineMedium = TextStyle(
                 fontFamily = dhunoraFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 23.sp,
+                fontWeight = FontWeight.Bold,
+                fontSize = 21.sp,
                 letterSpacing = (-0.25).sp
             ),
             titleLarge = TextStyle(
                 fontFamily = dhunoraFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp,
                 letterSpacing = (-0.15).sp
             ),
             titleMedium = TextStyle(
                 fontFamily = dhunoraFont,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp
             ),
             titleSmall = TextStyle(
                 fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
+                fontSize = 13.sp
             ),
             bodyLarge = TextStyle(
                 fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Normal,
-                fontSize = 15.sp,
-                lineHeight = 21.sp
+                fontSize = 14.sp,
+                lineHeight = 20.sp
             ),
             bodyMedium = TextStyle(
                 fontFamily = dhunoraFont,
                 fontWeight = FontWeight.Normal,
-                fontSize = 13.sp,
+                fontSize = 12.5.sp,
                 lineHeight = 18.sp
             ),
             bodySmall = TextStyle(
@@ -1101,7 +1103,8 @@ class MainActivity : ComponentActivity() {
                         romanizedLyrics = romanizedLyrics,
                         lyricsLines = lyricsResult?.lines.orEmpty(),
                         lyricsSource = lyricsResult?.source,
-                        lyricsLoading = lyricsLoading
+                        lyricsLoading = lyricsLoading,
+                        canvasUrl = lyricsResult?.canvasUrl
                     )
                 } else if (openedSearchItem != null) {
                     CollectionDetailScreen(
@@ -1843,8 +1846,8 @@ private fun MixScreen(
             Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Text(
                     "Mix",
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
                     "An endless radio shaped by what you listen to",
@@ -2252,8 +2255,8 @@ private fun SearchResultRow(
         Column(Modifier.weight(1f)) {
             Text(
                 item.title,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2605,8 +2608,8 @@ private fun LibraryScreen(
 
                 Text(
                     "Library",
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -3383,7 +3386,8 @@ private fun NowPlayingScreen(
     romanizedLyrics: Boolean,
     lyricsLines: List<String>,
     lyricsSource: String?,
-    lyricsLoading: Boolean
+    lyricsLoading: Boolean,
+    canvasUrl: String?
 ) {
     val fraction =
         (positionMs.toFloat() / durationMs.toFloat())
@@ -3486,14 +3490,26 @@ private fun NowPlayingScreen(
 
                 Spacer(Modifier.height(34.dp))
 
-                Artwork(
-                    song,
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 40.dp)
-                        .aspectRatio(1f),
-                    12.dp
-                )
+                if (!canvasUrl.isNullOrBlank()) {
+                    SpotifyCanvasPreview(
+                        canvasUrl = canvasUrl,
+                        fallbackSong = song,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 42.dp)
+                                .aspectRatio(9f / 14f)
+                    )
+                } else {
+                    Artwork(
+                        song,
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 40.dp)
+                            .aspectRatio(1f),
+                        12.dp
+                    )
+                }
 
                 Spacer(Modifier.height(38.dp))
 
@@ -3698,6 +3714,85 @@ private fun NowPlayingScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SpotifyCanvasPreview(
+    canvasUrl: String,
+    fallbackSong: Song,
+    modifier: Modifier = Modifier
+) {
+    var failed by remember(canvasUrl) {
+        mutableStateOf(false)
+    }
+    var videoView by remember {
+        mutableStateOf<VideoView?>(null)
+    }
+
+    DisposableEffect(canvasUrl) {
+        onDispose {
+            videoView?.stopPlayback()
+            videoView = null
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Artwork(
+            fallbackSong,
+            Modifier.fillMaxSize(),
+            16.dp
+        )
+
+        if (!failed) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
+                    VideoView(context).apply {
+                        videoView = this
+                        setOnPreparedListener { mediaPlayer ->
+                            mediaPlayer.isLooping = true
+                            mediaPlayer.setVolume(0f, 0f)
+                            start()
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            failed = true
+                            true
+                        }
+                        setVideoURI(Uri.parse(canvasUrl))
+                    }
+                },
+                update = { view ->
+                    if (view.tag != canvasUrl) {
+                        view.tag = canvasUrl
+                        view.setVideoURI(Uri.parse(canvasUrl))
+                        view.start()
+                    }
+                }
+            )
+        }
+
+        Surface(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = Color.Black.copy(alpha = 0.55f)
+        ) {
+            Text(
+                "Spotify Canvas",
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -4633,7 +4728,7 @@ private fun SettingsToggleRow(
             Spacer(Modifier.height(5.dp))
             Text(
                 subtitle,
-                fontSize = 13.sp,
+                fontSize = 12.5.sp,
                 lineHeight = 18.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
