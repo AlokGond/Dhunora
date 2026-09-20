@@ -451,6 +451,241 @@ object LyricsRepository {
             else -> null
         }
 
+    private fun spotifyTotpToken(spDc: String): String? {
+        val serverRequest =
+            Request.Builder()
+                .url("https://open.spotify.com/api/server-time")
+                .header("Cookie", "sp_dc=$spDc")
+                .header("User-Agent", "Mozilla/5.0")
+                .header("App-platform", "WebPlayer")
+                .header("Accept", "application/json")
+                .header("Origin", "https://open.spotify.com")
+                .header("Referer", "https://open.spotify.com/")
+                .build()
+
+        val serverTime =
+            client.newCall(serverRequest).execute().use { response ->
+                if (!response.isSuccessful) return null
+                JSONObject(response.body?.string().orEmpty())
+                    .optLong("serverTime", 0L)
+                    .takeIf { it > 0L }
+            } ?: return null
+
+        val secretData =
+            fetchSpotifyTotpSecret()
+                ?: FALLBACK_TOTP_SECRET
+
+        val otp =
+            generateSpotifyTotp(
+                serverTime * 1000L,
+                secretData
+            )
+
+        fun requestToken(reason: String): String? {
+            val url =
+                "https://open.spotify.com/api/token".toHttpUrl()
+                    .newBuilder()
+                    .addQueryParameter("reason", reason)
+                    .addQueryParameter("productType", "mobile-web-player")
+                    .addQueryParameter("totp", otp)
+                    .addQueryParameter("totpServer", otp)
+                    .addQueryParameter(
+                        "totpVer",
+                        secretData.first.toString()
+                    )
+                    .build()
+
+            val request =
+                Request.Builder()
+                    .url(url)
+                    .header("Cookie", "sp_dc=$spDc")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .header("Accept", "application/json")
+                    .header("Origin", "https://open.spotify.com")
+                    .header("Referer", "https://open.spotify.com/")
+                    .build()
+
+            return client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                JSONObject(response.body?.string().orEmpty())
+                    .optString("accessToken")
+                    .takeIf { it.isNotBlank() }
+            }
+        }
+
+        return requestToken("transport")
+            ?: requestToken("init")
+    }
+
+    private fun fetchSpotifyTotpSecret(): Pair<Int, List<Int>>? {
+        val request =
+            Request.Builder()
+                .url(
+                    "https://raw.githubusercontent.com/xyloflake/" +
+                        "spot-secrets-go/refs/heads/main/secrets/" +
+                        "secretDict.json"
+                )
+                .header("User-Agent", "Dhunora/1.0")
+                .build()
+
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+
+            val root =
+                JSONObject(
+                    response.body?.string().orEmpty()
+                )
+
+            val versions = mutableListOf<Int>()
+            val keys = root.keys()
+
+            while (keys.hasNext()) {
+                keys.next().toIntOrNull()
+                    ?.let(versions::add)
+            }
+
+            val version =
+                versions.maxOrNull()
+                    ?: return null
+
+            val array =
+                root.optJSONArray(version.toString())
+                    ?: return null
+
+            val secret =
+                buildList {
+                    for (i in 0 until array.length()) {
+                        add(array.optInt(i))
+                    }
+                }
+
+            version to secret
+        }
+    }
+
+    private fun generateSpotifyTotp(
+        timestampMs: Long,
+        secretData: Pair<Int, List<Int>>
+    ): String {
+        val transformed =
+            secretData.second.mapIndexed { index, value ->
+                value xor ((index % 33) + 9)
+            }
+
+        val joined =
+            transformed.joinToString("")
+                .toByteArray(Charsets.UTF_8)
+
+        val key =
+            decodeBase32(
+                encodeBase32(joined)
+            )
+
+        val counter = timestampMs / 30_000L
+        val counterBytes = ByteArray(8)
+        var value = counter
+
+        for (i in 7 downTo 0) {
+            counterBytes[i] =
+                (value and 0xFF).toByte()
+            value = value ushr 8
+        }
+
+        val mac = Mac.getInstance("HmacSHA1")
+        mac.init(SecretKeySpec(key, "HmacSHA1"))
+
+        val hash = mac.doFinal(counterBytes)
+        val offset =
+            hash.last().toInt() and 0x0F
+
+        val binary =
+            ((hash[offset].toInt() and 0x7F) shl 24) or
+                ((hash[offset + 1].toInt() and 0xFF) shl 16) or
+                ((hash[offset + 2].toInt() and 0xFF) shl 8) or
+                (hash[offset + 3].toInt() and 0xFF)
+
+        return (binary % 1_000_000)
+            .toString()
+            .padStart(6, '0')
+    }
+
+    private fun encodeBase32(data: ByteArray): String {
+        val alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+        val result = StringBuilder()
+        var bits = 0
+        var buffer = 0
+
+        data.forEach { byte ->
+            buffer =
+                (buffer shl 8) or
+                    (byte.toInt() and 0xFF)
+
+            bits += 8
+
+            while (bits >= 5) {
+                result.append(
+                    alphabet[
+                        (buffer shr (bits - 5)) and 31
+                    ]
+                )
+                bits -= 5
+            }
+        }
+
+        if (bits > 0) {
+            result.append(
+                alphabet[
+                    (buffer shl (5 - bits)) and 31
+                ]
+            )
+        }
+
+        return result.toString()
+    }
+
+    private fun decodeBase32(value: String): ByteArray {
+        val alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+        val output = ByteArrayOutputStream()
+        var bits = 0
+        var buffer = 0
+
+        value.uppercase()
+            .filter {
+                it != '=' &&
+                    !it.isWhitespace()
+            }
+            .forEach { char ->
+                val index =
+                    alphabet.indexOf(char)
+
+                if (index >= 0) {
+                    buffer =
+                        (buffer shl 5) or index
+                    bits += 5
+
+                    if (bits >= 8) {
+                        output.write(
+                            (buffer shr (bits - 8)) and 0xFF
+                        )
+                        bits -= 8
+                    }
+                }
+            }
+
+        return output.toByteArray()
+    }
+
+    private val FALLBACK_TOTP_SECRET =
+        22 to listOf(
+            99, 101, 119, 123, 69, 120,
+            91, 123, 97, 74, 53, 48,
+            76, 102, 55, 69, 110, 54
+        )
+
     private fun legacySpotifyLyrics(
         context: Context,
         song: Song
