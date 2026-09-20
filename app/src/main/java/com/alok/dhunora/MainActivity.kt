@@ -1545,7 +1545,7 @@ private fun HomeScreen(
                                 Text(
                                     mood,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp
+                                    fontSize = 13.sp
                                 )
                             },
                             shape = RoundedCornerShape(22.dp),
@@ -1573,8 +1573,8 @@ private fun HomeScreen(
                     ) {
                         Text(
                             "Welcome back,",
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
                             color = Color.White
                         )
                         Spacer(Modifier.height(10.dp))
@@ -1611,8 +1611,8 @@ private fun HomeScreen(
                             Spacer(Modifier.width(14.dp))
                             Text(
                                 profileName.ifBlank { "YouTube Music" },
-                                fontSize = 25.sp,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 21.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1633,8 +1633,8 @@ private fun HomeScreen(
                 Text(
                     "Quick picks",
                     Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    fontSize = 31.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -1663,8 +1663,8 @@ private fun HomeScreen(
                 Text(
                     "Forgotten favorites",
                     Modifier.padding(horizontal = 20.dp),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(14.dp))
                 LazyRow(
@@ -1694,8 +1694,8 @@ private fun HomeScreen(
             ) {
                 Text(
                     "More for you",
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -1738,12 +1738,12 @@ private fun HomeQuickPickRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Artwork(song, Modifier.size(54.dp), 9.dp)
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1831,8 +1831,8 @@ private fun MixScreen(
             Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Text(
                     "Mix",
-                    fontSize = 31.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     "An endless radio shaped by what you listen to",
@@ -1900,8 +1900,8 @@ private fun SearchScreen(
             ) {
                 Text(
                     "Search",
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
                 Surface(
@@ -2418,8 +2418,8 @@ private fun CollectionDetailScreen(
                 Text(
                     item.title,
                     color = Color.White,
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2593,8 +2593,8 @@ private fun LibraryScreen(
 
                 Text(
                     "Library",
-                    fontSize = 31.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -3460,8 +3460,8 @@ private fun NowPlayingScreen(
                         )
                         Text(
                             song.title,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3492,8 +3492,8 @@ private fun NowPlayingScreen(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 song.title,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 21.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 lineHeight = 24.sp
@@ -3501,7 +3501,7 @@ private fun NowPlayingScreen(
                             Spacer(Modifier.height(5.dp))
                             Text(
                                 song.artist,
-                                fontSize = 15.sp,
+                                fontSize = 13.5.sp,
                                 color = Color.White.copy(alpha = 0.68f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -3535,7 +3535,7 @@ private fun NowPlayingScreen(
                                 else
                                     Icons.Rounded.FavoriteBorder,
                                 null,
-                                modifier = Modifier.size(31.dp),
+                                modifier = Modifier.size(28.dp),
                                 tint =
                                     if (favorite)
                                         MaterialTheme.colorScheme.primary
@@ -3735,8 +3735,8 @@ private fun LyricsPreviewCard(
                 Text(
                     "Lyrics",
                     color = Color.White,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -3767,8 +3767,8 @@ private fun LyricsPreviewCard(
                     color = Color.White.copy(
                         alpha = if (lines.isNotEmpty()) 0.72f else 0.56f
                     ),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
                     lineHeight = 24.sp,
                     maxLines = 12,
                     overflow = TextOverflow.Ellipsis
@@ -3810,8 +3810,8 @@ private fun UpNextPreview(
             ) {
                 Text(
                     "Up next",
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -4419,8 +4419,8 @@ private fun SettingsScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "Settings",
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color.White
                 )
             }
@@ -4564,8 +4564,8 @@ private fun SettingsSectionTitle(title: String) {
     Text(
         title,
         Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
-        fontSize = 23.sp,
-        fontWeight = FontWeight.ExtraBold,
+        fontSize = 20.sp,
+        fontWeight = FontWeight.SemiBold,
         color = Color.White
     )
 }
@@ -4584,14 +4584,14 @@ private fun SettingsValueRow(
     ) {
         Text(
             title,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
             color = Color.White
         )
         Spacer(Modifier.height(5.dp))
         Text(
             value,
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -4613,8 +4613,8 @@ private fun SettingsToggleRow(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
                 lineHeight = 24.sp,
                 color = Color.White
             )
