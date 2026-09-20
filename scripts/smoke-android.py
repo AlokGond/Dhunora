@@ -29,6 +29,31 @@ def has_label(xml, label):
              for n in ET.fromstring(xml).iter('node'))
  except ET.ParseError: return False
 
+def click_search(xml):
+ if click_label(xml, 'Search'): return True
+ # Upstream's icon-only phone search FAB has no accessibility label. Locate the
+ # rightmost clickable control beside the labelled Library tab, then verify the
+ # destination's editable search field below; a tap alone is not a passing test.
+ try: nodes=list(ET.fromstring(xml).iter('node'))
+ except ET.ParseError: return False
+ def bounds(node): return list(map(int, re.findall(r'\d+', node.get('bounds',''))))
+ libraries=[bounds(n) for n in nodes if n.get('text')=='Library' and len(bounds(n))==4]
+ if not libraries: return False
+ anchor=max(libraries, key=lambda b: b[3])
+ ax,ay=(anchor[0]+anchor[2])/2,(anchor[1]+anchor[3])/2
+ candidates=[]
+ for n in nodes:
+  b=bounds(n)
+  if n.get('clickable')=='true' and len(b)==4:
+   x,y=(b[0]+b[2])/2,(b[1]+b[3])/2
+   if x>ax and abs(y-ay)<64 and 0<b[2]-b[0]<120 and 0<b[3]-b[1]<120:
+    candidates.append((x,y))
+ if not candidates: return False
+ x,y=max(candidates)
+ adb('shell','input','tap',str(int(x)),str(int(y)))
+ time.sleep(2)
+ return True
+
 def dismiss_startup(xml):
  # Multiple asynchronous first-run dialogs can appear in sequence. Re-read after each tap.
  for attempt in range(12):
@@ -52,10 +77,19 @@ xml=dismiss_startup(xml)
 assert adb('shell','pidof',pkg,check=False).strip(), 'App process exited after launch'
 results=[]
 for label in ('Search','Library','Home'):
- clicked=click_label(xml,label)
+ clicked=click_search(xml) if label=='Search' else click_label(xml,label)
  time.sleep(2)
  xml=capture('screen-'+label.lower())
- results.append(f'{label}: '+('opened' if clicked else 'control not found'))
+ verified=clicked and (
+  b'android.widget.EditText' in xml if label=='Search' else
+  has_label(xml,'Your library') if label=='Library' else has_label(xml,'Dhunora')
+ )
+ results.append(f'{label}: '+('opened' if verified else 'destination not verified'))
+ if label=='Search':
+  # Hide a focused search keyboard (or return Home) before selecting the next tab.
+  adb('shell','input','keyevent','KEYCODE_BACK')
+  time.sleep(2)
+  xml=capture('after-search-back')
 logs=adb('logcat','-d','-s','AndroidRuntime:E','ActivityManager:E')
 (out/'runtime-errors.txt').write_bytes(logs)
 (out/'navigation.txt').write_text('\n'.join(results))
