@@ -19,6 +19,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -108,6 +109,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -130,6 +132,9 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -387,6 +392,70 @@ class MainActivity : ComponentActivity() {
             onSurface = Color(0xFFF4F1FA),
             surfaceVariant = Color(0xFF1B1A21),
             onSurfaceVariant = Color(0xFFC8C3D2)
+        )
+
+        val appTypography = Typography(
+            displayLarge = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 34.sp,
+                letterSpacing = (-0.5).sp
+            ),
+            headlineLarge = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 27.sp,
+                letterSpacing = (-0.35).sp
+            ),
+            headlineMedium = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 23.sp,
+                letterSpacing = (-0.25).sp
+            ),
+            titleLarge = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 21.sp,
+                letterSpacing = (-0.15).sp
+            ),
+            titleMedium = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp
+            ),
+            titleSmall = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
+            ),
+            bodyLarge = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Normal,
+                fontSize = 15.sp,
+                lineHeight = 21.sp
+            ),
+            bodyMedium = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                lineHeight = 18.sp
+            ),
+            bodySmall = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp
+            ),
+            labelLarge = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            ),
+            labelMedium = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp
+            )
         )
 
         val loginLauncher =
@@ -984,7 +1053,7 @@ class MainActivity : ComponentActivity() {
             showSettings = false
         }
 
-        MaterialTheme(colorScheme = colors) {
+        MaterialTheme(colorScheme = colors, typography = appTypography) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -1124,7 +1193,7 @@ class MainActivity : ComponentActivity() {
                     ) { padding ->
                         Crossfade(
                             targetState = selectedTab,
-                            animationSpec = tween(durationMillis = 180),
+                            animationSpec = tween(durationMillis = 220),
                             label = "main_tab_crossfade"
                         ) { activeTab ->
                         when (activeTab) {
@@ -1423,18 +1492,29 @@ private fun HomeScreen(
                         .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Dhunora",
-                            fontSize = 29.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.8).sp
+                    Row(
+                        Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_dhunora_launcher),
+                            contentDescription = "Dhunora",
+                            modifier = Modifier.size(38.dp)
                         )
-                        Text(
-                            greeting,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp
-                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "Dhunora",
+                                fontSize = 23.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = (-0.35).sp
+                            )
+                            Text(
+                                greeting,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.5.sp
+                            )
+                        }
                     }
 
                     IconButton(onClick = onNotifications) {
@@ -1485,7 +1565,7 @@ private fun HomeScreen(
                     }
                 }
 
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(22.dp))
 
                 if (youtubeLoggedIn) {
                     Column(
@@ -1538,7 +1618,7 @@ private fun HomeScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Spacer(Modifier.height(28.dp))
+                        Spacer(Modifier.height(22.dp))
                     }
                 }
 
@@ -1579,7 +1659,7 @@ private fun HomeScreen(
 
         if (madeForYou.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(22.dp))
                 Text(
                     "Forgotten favorites",
                     Modifier.padding(horizontal = 20.dp),
@@ -1605,7 +1685,7 @@ private fun HomeScreen(
         }
 
         item {
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(24.dp))
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -1657,7 +1737,7 @@ private fun HomeQuickPickRow(
             .padding(horizontal = 22.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Artwork(song, Modifier.size(58.dp), 7.dp)
+        Artwork(song, Modifier.size(54.dp), 9.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -1695,7 +1775,7 @@ private fun LargeHomeCard(
 ) {
     Column(
         Modifier
-            .width(286.dp)
+            .width(248.dp)
             .clickable(onClick = onClick)
     ) {
         Box {
@@ -1703,7 +1783,7 @@ private fun LargeHomeCard(
                 song,
                 Modifier
                     .fillMaxWidth()
-                    .height(180.dp),
+                    .height(156.dp),
                 16.dp
             )
             Surface(
@@ -3416,7 +3496,7 @@ private fun NowPlayingScreen(
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                lineHeight = 27.sp
+                                lineHeight = 24.sp
                             )
                             Spacer(Modifier.height(5.dp))
                             Text(
@@ -3511,13 +3591,13 @@ private fun NowPlayingScreen(
                             Icon(
                                 Icons.Rounded.SkipPrevious,
                                 "Previous",
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
 
                         FilledIconButton(
                             onClick = onTogglePlay,
-                            modifier = Modifier.size(82.dp),
+                            modifier = Modifier.size(76.dp),
                             colors =
                                 androidx.compose.material3.IconButtonDefaults
                                     .filledIconButtonColors(
@@ -3538,7 +3618,7 @@ private fun NowPlayingScreen(
                                     else
                                         Icons.Rounded.PlayArrow,
                                     null,
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier.size(36.dp)
                                 )
                             }
                         }
@@ -3547,7 +3627,7 @@ private fun NowPlayingScreen(
                             Icon(
                                 Icons.Rounded.SkipNext,
                                 "Next",
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
 
@@ -3689,7 +3769,7 @@ private fun LyricsPreviewCard(
                     ),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    lineHeight = 28.sp,
+                    lineHeight = 24.sp,
                     maxLines = 12,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -4465,8 +4545,8 @@ private fun SettingsScreen(
             Text(
                 "Dhunora",
                 Modifier.padding(horizontal = 28.dp),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = Color.White
             )
             Text(
