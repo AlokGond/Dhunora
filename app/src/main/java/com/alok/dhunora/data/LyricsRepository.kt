@@ -438,8 +438,8 @@ object LyricsRepository {
         bytes: ByteArray,
         start: Int,
         wire: Int
-    ): Int? =
-        when (wire) {
+    ): Int? {
+        return when (wire) {
             0 -> readVarint(bytes, start)?.second
             1 -> (start + 8).takeIf { it <= bytes.size }
             2 -> {
@@ -450,6 +450,7 @@ object LyricsRepository {
             5 -> (start + 4).takeIf { it <= bytes.size }
             else -> null
         }
+    }
 
     private fun spotifyTotpToken(spDc: String): String? {
         val serverRequest =
