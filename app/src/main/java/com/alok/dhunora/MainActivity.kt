@@ -2327,10 +2327,12 @@ private fun CollectionDetailScreen(
 
                 Text(
                     when (item.kind) {
+                        SearchKind.ALL -> item.subtitle
                         SearchKind.ARTIST -> item.subtitle
                         SearchKind.ALBUM -> "Album • " + item.subtitle
                         SearchKind.PLAYLIST -> "Playlist • " + item.subtitle
                         SearchKind.SONG -> item.subtitle
+                        SearchKind.VIDEO -> "Video • " + item.subtitle
                     },
                     color = Color.White.copy(alpha = 0.72f),
                     fontSize = 14.sp,
