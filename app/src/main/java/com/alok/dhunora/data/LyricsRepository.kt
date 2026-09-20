@@ -278,7 +278,7 @@ object LyricsRepository {
 
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
-            parseCanvasResponse(response.body?.bytes().orEmpty())
+            parseCanvasResponse(response.body?.bytes() ?: ByteArray(0))
         }
     }
 
