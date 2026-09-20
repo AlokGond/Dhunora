@@ -11,8 +11,8 @@ android {
         applicationId = "com.alok.dhunora"
         minSdk = 23
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.18.0"
+        versionCode = 19
+        versionName = "0.19.0"
     }
 
     compileOptions {
