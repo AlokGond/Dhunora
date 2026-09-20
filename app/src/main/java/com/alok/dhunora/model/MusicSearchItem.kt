@@ -1,10 +1,12 @@
 package com.alok.dhunora.model
 
 enum class SearchKind(val label: String) {
+    ALL("All"),
     SONG("Songs"),
+    VIDEO("Videos"),
     ALBUM("Albums"),
-    PLAYLIST("Playlists"),
-    ARTIST("Artists")
+    ARTIST("Artists"),
+    PLAYLIST("Playlists")
 }
 
 data class MusicSearchItem(
@@ -17,7 +19,7 @@ data class MusicSearchItem(
     val itemCount: Long = 0
 ) {
     fun toSongOrNull(): Song? =
-        if (kind == SearchKind.SONG) {
+        if (kind == SearchKind.SONG || kind == SearchKind.VIDEO) {
             Song(
                 title = title,
                 artist = subtitle,
