@@ -322,7 +322,7 @@ class MainActivity : ComponentActivity() {
         var searchResults by remember { mutableStateOf<List<MusicSearchItem>>(emptyList()) }
         var liveSearchResults by remember { mutableStateOf<List<MusicSearchItem>>(emptyList()) }
         var searchCommitted by rememberSaveable { mutableStateOf(false) }
-        var selectedSearchKind by rememberSaveable { mutableStateOf(SearchKind.SONG) }
+        var selectedSearchKind by rememberSaveable { mutableStateOf(SearchKind.ALL) }
         var openedSearchItem by remember { mutableStateOf<MusicSearchItem?>(null) }
         var openedSearchSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
         var loadingSearchDetail by remember { mutableStateOf(false) }
@@ -761,7 +761,11 @@ class MainActivity : ComponentActivity() {
                             searchResults = results
                             error = null
 
-                            if (kind == SearchKind.SONG) {
+                            if (
+                                kind == SearchKind.ALL ||
+                                kind == SearchKind.SONG ||
+                                kind == SearchKind.VIDEO
+                            ) {
                                 val likelyNext =
                                     results
                                         .mapNotNull { result -> result.toSongOrNull() }
@@ -803,7 +807,10 @@ class MainActivity : ComponentActivity() {
             searchSignals =
                 ListeningProfileStore.recentSearches(this@MainActivity)
 
-            if (item.kind == SearchKind.SONG) {
+            if (
+                item.kind == SearchKind.SONG ||
+                item.kind == SearchKind.VIDEO
+            ) {
                 val song = item.toSongOrNull() ?: return
                 startRecommendationRadio(song)
                 return
@@ -828,9 +835,7 @@ class MainActivity : ComponentActivity() {
                 searchCommitted ||
                 clean.length < 2
             ) {
-                if (clean.length < 2) {
-                    liveSearchResults = emptyList()
-                }
+                if (clean.length < 2) liveSearchResults = emptyList()
                 return@LaunchedEffect
             }
 
@@ -838,44 +843,8 @@ class MainActivity : ComponentActivity() {
 
             try {
                 val mixed =
-                    coroutineScope {
-                        val artist =
-                            async {
-                                runCatching {
-                                    MusicRepository.search(clean, SearchKind.ARTIST)
-                                }.getOrDefault(emptyList())
-                            }
-
-                        val playlist =
-                            async {
-                                runCatching {
-                                    MusicRepository.search(clean, SearchKind.PLAYLIST)
-                                }.getOrDefault(emptyList())
-                            }
-
-                        val song =
-                            async {
-                                runCatching {
-                                    MusicRepository.search(clean, SearchKind.SONG)
-                                }.getOrDefault(emptyList())
-                            }
-
-                        val album =
-                            async {
-                                runCatching {
-                                    MusicRepository.search(clean, SearchKind.ALBUM)
-                                }.getOrDefault(emptyList())
-                            }
-
-                        buildList {
-                            addAll(artist.await().take(1))
-                            addAll(playlist.await().take(1))
-                            addAll(song.await().take(3))
-                            addAll(album.await().take(1))
-                        }
-                            .distinctBy { it.kind.name + ":" + it.sourceUrl }
-                            .take(6)
-                    }
+                    MusicRepository.search(clean, SearchKind.ALL)
+                        .take(8)
 
                 if (
                     selectedTab == MainTab.SEARCH &&
@@ -1909,52 +1878,27 @@ private fun SearchScreen(
         contentPadding = PaddingValues(bottom = 20.dp)
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Search",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-                Surface(
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .clickable(onClick = onAccount),
-                    shape = CircleShape,
-                    color =
-                        if (accountConnected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = "Account",
-                            modifier = Modifier.size(22.dp),
-                            tint =
-                                if (accountConnected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(10.dp))
 
             TextField(
                 value = text,
                 onValueChange = onText,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                shape = RoundedCornerShape(28.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(58.dp),
+                shape = RoundedCornerShape(12.dp),
                 singleLine = true,
                 placeholder = {
                     Text(
                         when (selectedKind) {
+                            SearchKind.ALL -> "Search songs, artists, albums..."
                             SearchKind.SONG -> "Search songs..."
+                            SearchKind.VIDEO -> "Search videos..."
                             SearchKind.ALBUM -> "Search albums..."
-                            SearchKind.PLAYLIST -> "Search playlists..."
                             SearchKind.ARTIST -> "Search artists..."
+                            SearchKind.PLAYLIST -> "Search playlists..."
                         }
                     )
                 },
@@ -1991,14 +1935,27 @@ private fun SearchScreen(
                         FilterChip(
                             selected = selectedKind == kind,
                             onClick = { onKindChange(kind) },
-                            label = { Text(kind.label) },
+                            label = {
+                                Text(
+                                    kind.label,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(20.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor =
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.36f),
-                                selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                                 containerColor = Color.Transparent
                             ),
-                            border = null
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    if (selectedKind == kind)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                                )
                         )
                     }
                 }
@@ -2103,7 +2060,7 @@ private fun SearchScreen(
                 )
                 BrowseGrid(
                     browse = browse,
-                    onClick = { onSubmit(it, SearchKind.SONG) }
+                    onClick = { onSubmit(it, SearchKind.ALL) }
                 )
             }
         } else if (committed && !loading && results.isEmpty() && text.isNotBlank()) {
@@ -2133,91 +2090,8 @@ private fun SearchScreen(
         }
 
         if (committed && results.isNotEmpty()) {
-            if (selectedKind == SearchKind.SONG && text.isNotBlank()) {
-                item {
-                    Text(
-                        "Top results",
-                        Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                        fontSize = 23.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                items(
-                    items = results.take(5),
-                    key = { "top:" + it.sourceUrl }
-                ) { item ->
-                    SearchResultRow(
-                        item = item,
-                        favorite = item.toSongOrNull()?.let(favoriteCheck) ?: false,
-                        onClick = { onOpen(item) },
-                        onFavorite = { item.toSongOrNull()?.let(onFavorite) }
-                    )
-                }
-
-                val suggestions =
-                    results
-                        .drop(5)
-                        .map { it.title.trim() }
-                        .filter { it.isNotBlank() }
-                        .distinctBy { it.lowercase() }
-                        .take(5)
-
-                items(
-                    items = suggestions,
-                    key = { "suggest:" + it.lowercase() }
-                ) { suggestion ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onSuggestion(suggestion) }
-                            .padding(horizontal = 26.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            suggestion.lowercase(),
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Icon(
-                            Icons.Rounded.ArrowBack,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .graphicsLayer { rotationZ = 135f },
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                if (results.size > 5) {
-                    item {
-                        Text(
-                            "More songs",
-                            Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            } else {
-                item {
-                    Text(
-                        selectedKind.label,
-                        Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
             items(
-                items =
-                    if (selectedKind == SearchKind.SONG && text.isNotBlank()) results.drop(5)
-                    else results,
+                items = results,
                 key = { "all:" + it.kind.name + ":" + it.sourceUrl }
             ) { item ->
                 SearchResultRow(
@@ -2265,8 +2139,15 @@ private fun SearchResultRow(
 
             val meta =
                 when (item.kind) {
+                    SearchKind.ALL ->
+                        item.subtitle
+
                     SearchKind.SONG ->
                         item.subtitle +
+                            if (item.durationSeconds > 0) " • " + formatDuration(item.durationSeconds) else ""
+
+                    SearchKind.VIDEO ->
+                        "Video • " + item.subtitle +
                             if (item.durationSeconds > 0) " • " + formatDuration(item.durationSeconds) else ""
 
                     SearchKind.ALBUM ->
@@ -2291,7 +2172,10 @@ private fun SearchResultRow(
             )
         }
 
-        if (item.kind == SearchKind.SONG) {
+        if (
+            item.kind == SearchKind.SONG ||
+            item.kind == SearchKind.VIDEO
+        ) {
             IconButton(onClick = onFavorite) {
                 Icon(
                     if (favorite) Icons.Rounded.Favorite else Icons.Rounded.MoreVert,
@@ -2318,7 +2202,7 @@ private fun SearchArtwork(
 ) {
     val shape =
         if (item.kind == SearchKind.ARTIST) CircleShape
-        else RoundedCornerShape(5.dp)
+        else RoundedCornerShape(6.dp)
 
     Surface(
         modifier = modifier,
