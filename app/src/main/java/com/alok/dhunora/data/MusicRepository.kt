@@ -40,6 +40,81 @@ object MusicRepository {
 
             val results =
                 when (kind) {
+                    SearchKind.ALL ->
+                        coroutineScope {
+                            val artistsJob =
+                                async(Dispatchers.IO) {
+                                    runCatching { search(clean, SearchKind.ARTIST) }
+                                        .getOrDefault(emptyList())
+                                }
+                            val songsJob =
+                                async(Dispatchers.IO) {
+                                    runCatching { search(clean, SearchKind.SONG) }
+                                        .getOrDefault(emptyList())
+                                }
+                            val videosJob =
+                                async(Dispatchers.IO) {
+                                    runCatching { search(clean, SearchKind.VIDEO) }
+                                        .getOrDefault(emptyList())
+                                }
+                            val albumsJob =
+                                async(Dispatchers.IO) {
+                                    runCatching { search(clean, SearchKind.ALBUM) }
+                                        .getOrDefault(emptyList())
+                                }
+                            val playlistsJob =
+                                async(Dispatchers.IO) {
+                                    runCatching { search(clean, SearchKind.PLAYLIST) }
+                                        .getOrDefault(emptyList())
+                                }
+
+                            buildList {
+                                addAll(artistsJob.await().take(3))
+                                addAll(songsJob.await().take(18))
+                                addAll(videosJob.await().take(14))
+                                addAll(albumsJob.await().take(10))
+                                addAll(playlistsJob.await().take(10))
+                            }
+                                .distinctBy { it.kind.name + ":" + it.sourceUrl }
+                                .take(55)
+                        }
+
+                    SearchKind.VIDEO ->
+                        coroutineScope {
+                            val webJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        YouTubeSearchApi.searchVideos(clean)
+                                            .map { it.copy(kind = SearchKind.VIDEO) }
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            val generalJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch(
+                                            clean,
+                                            SearchKind.VIDEO
+                                        )
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            val officialJob =
+                                async(Dispatchers.IO) {
+                                    runCatching {
+                                        doGeneralSongSearch(
+                                            "$clean official video",
+                                            SearchKind.VIDEO
+                                        )
+                                    }.getOrDefault(emptyList())
+                                }
+
+                            (webJob.await() + generalJob.await() + officialJob.await())
+                                .distinctBy { it.sourceUrl }
+                                .sortedByDescending { scoreSongResult(clean, it) }
+                                .take(45)
+                        }
+
                     SearchKind.SONG ->
                         coroutineScope {
                             val ytmJob =
@@ -115,6 +190,8 @@ object MusicRepository {
                                 SearchKind.PLAYLIST -> YoutubeSearchQueryHandlerFactory.MUSIC_PLAYLISTS
                                 SearchKind.ARTIST -> YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS
                                 SearchKind.SONG -> YoutubeSearchQueryHandlerFactory.MUSIC_SONGS
+                                SearchKind.VIDEO -> YoutubeSearchQueryHandlerFactory.VIDEOS
+                                SearchKind.ALL -> YoutubeSearchQueryHandlerFactory.MUSIC_SONGS
                             }
 
                         val primary =
@@ -178,7 +255,10 @@ object MusicRepository {
             .distinctBy { it.sourceUrl }
     }
 
-    private fun doGeneralSongSearch(query: String): List<MusicSearchItem> {
+    private fun doGeneralSongSearch(
+        query: String,
+        requestedKind: SearchKind = SearchKind.SONG
+    ): List<MusicSearchItem> {
         val service = ServiceList.YouTube
         val handler = service.searchQHFactory.fromQuery(query)
 
@@ -186,7 +266,7 @@ object MusicRepository {
             .filterIsInstance<StreamInfoItem>()
             .map { item ->
                 MusicSearchItem(
-                    kind = SearchKind.SONG,
+                    kind = requestedKind,
                     title = item.name,
                     subtitle = item.uploaderName ?: "Unknown artist",
                     sourceUrl = item.url,
@@ -250,9 +330,12 @@ object MusicRepository {
     private fun InfoItem.toSearchItem(requestedKind: SearchKind): MusicSearchItem? =
         when (this) {
             is StreamInfoItem -> {
-                if (requestedKind != SearchKind.SONG) return null
+                if (
+                    requestedKind != SearchKind.SONG &&
+                    requestedKind != SearchKind.VIDEO
+                ) return null
                 MusicSearchItem(
-                    kind = SearchKind.SONG,
+                    kind = requestedKind,
                     title = name,
                     subtitle = uploaderName ?: "Unknown artist",
                     sourceUrl = url,
@@ -533,7 +616,11 @@ object MusicRepository {
     suspend fun loadCollection(item: MusicSearchItem): List<Song> =
         withContext(Dispatchers.IO) {
             when (item.kind) {
-                SearchKind.SONG -> listOfNotNull(item.toSongOrNull())
+                SearchKind.SONG, SearchKind.VIDEO ->
+                    listOfNotNull(item.toSongOrNull())
+
+                SearchKind.ALL ->
+                    emptyList()
 
                 SearchKind.ALBUM, SearchKind.PLAYLIST -> {
                     runCatching {
