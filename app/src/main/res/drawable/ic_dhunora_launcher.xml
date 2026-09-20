@@ -4,13 +4,39 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Deep neutral background; all foreground content stays inside the safe icon zone. -->
     <path
-        android:fillColor="#17131F"
-        android:pathData="M54,4 A50,50 0,1 1,53.9 4"/>
+        android:fillColor="#0B0910"
+        android:pathData="M54,7 A47,47 0,1 1,53.9 7"/>
+
+    <!-- Soft inner disc. -->
     <path
-        android:fillColor="#B69CFF"
+        android:fillColor="#181225"
         android:pathData="M54,14 A40,40 0,1 1,53.9 14"/>
+
+    <!-- Waveform bars. -->
+    <path android:fillColor="#7D4DFF" android:pathData="M18,50 A3,3 0,0 1,21,47 L21,61 A3,3 0,0 1,18,64 A3,3 0,0 1,15,61 L15,50 A3,3 0,0 1,18,47 Z"/>
+    <path android:fillColor="#9A69FF" android:pathData="M27,42 A3,3 0,0 1,30,39 L30,69 A3,3 0,0 1,27,72 A3,3 0,0 1,24,69 L24,42 A3,3 0,0 1,27,39 Z"/>
+    <path android:fillColor="#B792FF" android:pathData="M36,46 A3,3 0,0 1,39,43 L39,65 A3,3 0,0 1,36,68 A3,3 0,0 1,33,65 L33,46 A3,3 0,0 1,36,43 Z"/>
+
+    <!-- Outer D / sound ribbon. -->
     <path
-        android:fillColor="#211044"
-        android:pathData="M65,28 L65,63 C61,60 57,59 53,59 C44,59 37,64 37,72 C37,80 44,85 53,85 C64,85 71,78 71,68 L71,42 L86,39 L86,29 Z M53,66 C58,66 62,68 62,72 C62,76 58,79 53,79 C48,79 44,76 44,72 C44,68 48,66 53,66 Z"/>
+        android:fillColor="#7C3CFF"
+        android:pathData="M39,22 C58,13 82,18 93,37 C104,56 96,79 77,91 C63,99 47,97 35,91 C51,78 62,66 68,53 C62,39 51,29 39,22 Z"/>
+
+    <!-- Highlight ribbon. -->
+    <path
+        android:fillColor="#C49BFF"
+        android:pathData="M43,24 C58,18 76,23 85,35 C91,43 94,52 92,60 C87,46 77,35 65,29 C57,25 50,23 43,24 Z"/>
+
+    <!-- Dark inner countershape. -->
+    <path
+        android:fillColor="#24103F"
+        android:pathData="M49,31 C62,36 72,44 76,54 C72,66 63,76 51,83 C60,69 63,59 60,49 C57,41 53,35 49,31 Z"/>
+
+    <!-- Music note. -->
+    <path
+        android:fillColor="#F1E8FF"
+        android:pathData="M49,35 C49,32 51,30 54,30 C57,30 59,32 59,35 L59,61 C62,59 65,58 68,58 C75,58 80,62 80,68 C80,74 75,78 68,78 C60,78 55,74 55,68 L55,45 C55,42 54,40 52,39 C50,38 49,37 49,35 Z M68,64 C72,64 74,66 74,68 C74,71 72,73 68,73 C64,73 62,71 62,68 C62,66 64,64 68,64 Z"/>
 </vector>
