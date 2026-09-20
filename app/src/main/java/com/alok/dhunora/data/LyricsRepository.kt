@@ -5,17 +5,31 @@ import com.alok.dhunora.account.SpotifySession
 import com.alok.dhunora.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 data class LyricsResult(
     val lines: List<String>,
-    val source: String
+    val source: String,
+    val canvasUrl: String? = null,
+    val canvasThumbUrl: String? = null
+)
+
+private data class SpotifyBundle(
+    val accessToken: String,
+    val clientToken: String,
+    val trackId: String
 )
 
 object LyricsRepository {
@@ -27,17 +41,49 @@ object LyricsRepository {
 
     suspend fun load(context: Context, song: Song): LyricsResult? =
         withContext(Dispatchers.IO) {
-            val spotify =
+            val bundle =
                 if (SpotifySession.isLoggedIn(context)) {
-                    runCatching { spotifyLyrics(context, song) }.getOrNull()
+                    runCatching { spotifyBundle(context, song) }.getOrNull()
                 } else {
                     null
                 }
 
-            spotify ?: runCatching { lrclibLyrics(song) }.getOrNull()
+            val spotifyLines =
+                bundle?.let { runCatching { spotifyLyricsWithBundle(it) }.getOrNull() }
+
+            val canvas =
+                bundle?.let { runCatching { spotifyCanvas(it) }.getOrNull() }
+
+            if (!spotifyLines.isNullOrEmpty()) {
+                return@withContext LyricsResult(
+                    lines = spotifyLines,
+                    source = "Spotify",
+                    canvasUrl = canvas?.first,
+                    canvasThumbUrl = canvas?.second
+                )
+            }
+
+            val fallback = runCatching { lrclibLyrics(song) }.getOrNull()
+            if (fallback != null) {
+                return@withContext fallback.copy(
+                    canvasUrl = canvas?.first,
+                    canvasThumbUrl = canvas?.second
+                )
+            }
+
+            canvas?.first?.let {
+                return@withContext LyricsResult(
+                    lines = emptyList(),
+                    source = "Spotify",
+                    canvasUrl = it,
+                    canvasThumbUrl = canvas.second
+                )
+            }
+
+            null
         }
 
-    private fun spotifyLyrics(
+    private fun legacySpotifyLyrics(
         context: Context,
         song: Song
     ): LyricsResult? {
