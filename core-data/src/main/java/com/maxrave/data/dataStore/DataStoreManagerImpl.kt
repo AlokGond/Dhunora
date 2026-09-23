@@ -1,5 +1,6 @@
 package com.maxrave.data.dataStore
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -9,8 +10,10 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.maxrave.common.SELECTED_LANGUAGE
 import com.maxrave.common.SUPPORTED_LANGUAGE
+import com.maxrave.common.SETTINGS_FILENAME
 import com.maxrave.common.SponsorBlockType
 import createDataStore
+import org.koin.core.context.GlobalContext
 import com.maxrave.domain.data.model.network.ProxyConfiguration
 import com.maxrave.domain.data.player.ReverbPreset
 import com.maxrave.domain.manager.DataStoreManager
@@ -1888,6 +1891,6 @@ internal class DataStoreManagerImpl(
 
 fun createDataStoreInstance(): DataStore<Preferences> {
     return createDataStore(
-        producePath = { getKoin().get<Context>().filesDir.resolve("datastore/$SETTINGS_FILENAME.preferences_pb").absolutePath }
+        producePath = { GlobalContext.get().get<Context>().filesDir.resolve("datastore/$SETTINGS_FILENAME.preferences_pb").absolutePath }
     )
 }

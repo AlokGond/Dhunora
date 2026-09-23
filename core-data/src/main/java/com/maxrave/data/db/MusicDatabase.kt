@@ -1,11 +1,19 @@
 package com.maxrave.data.db
 
 import DatabaseDao
+import android.content.Context
 import androidx.room.Database
+import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.execSQL
+import androidx.room.migration.Migration
 import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteConnection
+import com.maxrave.common.DB_NAME
+import com.maxrave.logger.Logger
+import kotlinx.serialization.json.Json
+import org.koin.core.context.GlobalContext
 import com.maxrave.domain.data.entities.AlbumEntity
 import com.maxrave.domain.data.entities.ArtistEntity
 import com.maxrave.domain.data.entities.AutoEqCurveEntity
@@ -74,7 +82,7 @@ fun getDatabaseBuilder(converters: Converters) : RoomDatabase.Builder<MusicDatab
             explicitNulls = false
         }
     return Room
-        .databaseBuilder(getKoin().get(), MusicDatabase::class.java, DB_NAME)
+        .databaseBuilder(GlobalContext.get().get(), MusicDatabase::class.java, DB_NAME)
         .addTypeConverter(converters)
         .addMigrations(
             object : Migration(5, 6) {
@@ -181,5 +189,5 @@ fun getDatabaseBuilder(converters: Converters) : RoomDatabase.Builder<MusicDatab
 }
 
 fun getDatabasePath(): String {
-    return getKoin().get<Context>().getDatabasePath(DB_NAME).path
+    return GlobalContext.get().get<Context>().getDatabasePath(DB_NAME).path
 }
