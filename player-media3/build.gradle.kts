@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -17,9 +16,6 @@ android {
     }
     kotlin {
         jvmToolchain(17)
-    }
-    buildFeatures {
-        compose = true
     }
 }
 
