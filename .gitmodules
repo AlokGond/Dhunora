@@ -1,0 +1,3 @@
+[submodule "upstream/SimpMusic"]
+    path = upstream/SimpMusic
+    url = https://github.com/maxrave-dev/SimpMusic.git

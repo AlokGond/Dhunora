@@ -1,0 +1,912 @@
+diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
+index 428b2a1..aa88ddc 100644
+--- a/androidApp/build.gradle.kts
++++ b/androidApp/build.gradle.kts
+@@ -2,7 +2,7 @@ import java.util.Properties
+ 
+ val isFullBuild: Boolean =
+     try {
+-        extra["isFullBuild"] == "true"
++        false
+     } catch (e: Exception) {
+         false
+     }
+@@ -20,7 +20,7 @@ android {
+     compileSdk = 37
+ 
+     defaultConfig {
+-        applicationId = "com.maxrave.simpmusic"
++        applicationId = "com.alok.dhunora"
+         minSdk = 26
+         targetSdk = 36
+         versionCode =
+@@ -158,6 +158,8 @@ dependencies {
+     val debugImplementation = "debugImplementation"
+     debugImplementation(libs.ui.tooling)
+     implementation(libs.activity.compose)
++    implementation(libs.kermit.logging)
++    implementation(libs.room.runtime)
+ 
+     // Custom Activity On Crash
+     implementation(libs.customactivityoncrash)
+diff --git a/androidApp/src/debug/res/values/app_name.xml b/androidApp/src/debug/res/values/app_name.xml
+index a279775..f0716c8 100644
+--- a/androidApp/src/debug/res/values/app_name.xml
++++ b/androidApp/src/debug/res/values/app_name.xml
+@@ -1,3 +1,3 @@
+ <resources>
+-    <string name="app_name">SimpMusic Dev</string>
++    <string name="app_name">Dhunora Dev</string>
+ </resources>
+\ No newline at end of file
+diff --git a/androidApp/src/main/AndroidManifest.xml b/androidApp/src/main/AndroidManifest.xml
+index d56b4ee..521f08f 100644
+--- a/androidApp/src/main/AndroidManifest.xml
++++ b/androidApp/src/main/AndroidManifest.xml
+@@ -40,7 +40,7 @@
+         </intent>
+     </queries>
+     <queries>
+-        <package android:name="com.maxrave.simpmusic" />
++        <package android:name="com.alok.dhunora" />
+     </queries>
+     <queries>
+         <intent>
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/LegacyDhunoraMigration.kt b/androidApp/src/main/java/com/maxrave/simpmusic/LegacyDhunoraMigration.kt
+new file mode 100644
+index 0000000..7852ced
+--- /dev/null
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/LegacyDhunoraMigration.kt
+@@ -0,0 +1,57 @@
++package com.maxrave.simpmusic
++
++import android.content.Context
++import android.net.Uri
++import com.maxrave.data.db.MusicDatabase
++import com.maxrave.domain.data.entities.LocalPlaylistEntity
++import com.maxrave.domain.data.entities.SearchHistory
++import com.maxrave.domain.data.entities.SongEntity
++import org.json.JSONArray
++import org.json.JSONObject
++import org.koin.mp.KoinPlatform.getKoin
++
++/** Imports the old Dhunora library once without deleting its original preferences. */
++internal object LegacyDhunoraMigration {
++    suspend fun migrate(context: Context) {
++        val migration = context.getSharedPreferences("dhunora_migration", Context.MODE_PRIVATE)
++        if (migration.getBoolean("simp_v1", false)) return
++        val playlistPrefs = context.getSharedPreferences("dhunora_playlists", Context.MODE_PRIVATE)
++        val profile = context.getSharedPreferences("dhunora_listening_profile", Context.MODE_PRIVATE)
++        val playlist = parseSongs(playlistPrefs.getString("My Playlist", "[]") ?: "[]")
++        val recent = parseSongs(profile.getString("recent", "[]") ?: "[]")
++        val searches = JSONArray(profile.getString("searches", "[]") ?: "[]")
++        val dao = getKoin().get<MusicDatabase>().getDatabaseDao()
++        (playlist + recent).distinctBy { it.videoId }.forEach { dao.insertSong(it) }
++        if (playlist.isNotEmpty()) {
++            // Fixed id makes retries safe even if the process dies before the completion marker.
++            dao.insertLocalPlaylistWithTracks(
++                LocalPlaylistEntity(id = -170001L, title = "My Playlist", tracks = playlist.map { it.videoId }),
++                playlist.map { it.videoId },
++            )
++        }
++        for (i in 0 until searches.length()) {
++            searches.optString(i).trim().takeIf { it.isNotEmpty() }?.let { dao.insertSearchHistory(SearchHistory(it)) }
++        }
++        check(migration.edit().putBoolean("simp_v1", true).commit())
++    }
++
++    private fun parseSongs(raw: String): List<SongEntity> {
++        val items = JSONArray(raw)
++        return (0 until items.length()).mapNotNull { i -> items.optJSONObject(i)?.toSong() }
++            .distinctBy { it.videoId }
++    }
++
++    private fun JSONObject.toSong(): SongEntity? {
++        val uri = runCatching { Uri.parse(optString("url")) }.getOrNull() ?: return null
++        val id = uri.getQueryParameter("v") ?: uri.lastPathSegment ?: return null
++        if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return null
++        val seconds = optInt("duration").coerceAtLeast(0)
++        return SongEntity(
++            videoId = id, artistName = listOf(optString("artist")),
++            title = optString("title"), duration = "%d:%02d".format(seconds / 60, seconds % 60),
++            durationSeconds = seconds, isAvailable = true, isExplicit = false,
++            likeStatus = "INDIFFERENT", thumbnails = optString("thumb").takeIf { it.isNotBlank() },
++            videoType = "MUSIC_VIDEO_TYPE_ATV", category = null, resultType = "song",
++        )
++    }
++}
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+index 6591c6b..5220e8b 100644
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+@@ -55,7 +55,7 @@ class SimpMusicApplication :
+         configCrashlytics(this, BuildKonfig.sentryDsn)
+         configLastfm(BuildKonfig.lastfmApiKey, BuildKonfig.lastfmSecret)
+         startKoin {
+-            androidLogger(level = Level.DEBUG)
++            androidLogger(level = if (BuildConfig.DEBUG) Level.DEBUG else Level.ERROR)
+             androidContext(this@SimpMusicApplication)
+             loadAllModules(
+                 AppIdentity(
+@@ -66,6 +66,13 @@ class SimpMusicApplication :
+             )
+             loadKoinModules(viewModelModule)
+         }
++        co.touchlab.kermit.Logger.setMinSeverity(
++            if (BuildConfig.DEBUG) co.touchlab.kermit.Severity.Debug else co.touchlab.kermit.Severity.Warn,
++        )
++        applicationScope.launch(Dispatchers.IO) {
++            runCatching { LegacyDhunoraMigration.migrate(this@SimpMusicApplication) }
++                .onFailure { Log.w("Dhunora", "Legacy library import will retry on next launch", it) }
++        }
+         // provide custom configuration
+         val workConfig =
+             Configuration
+@@ -95,11 +102,13 @@ class SimpMusicApplication :
+             .restartActivity(MainActivity::class.java) // default: null (your app's launch activity)
+             .apply()
+ 
++        runCatching {
+         @SuppressLint("DiscouragedPrivateApi")
+         val field: Field = CursorWindow::class.java.getDeclaredField("sCursorWindowSize")
+         field.isAccessible = true
+         val expectSize = 100 * 1024 * 1024
+         field.set(null, expectSize)
++        }.onFailure { Log.w("Dhunora", "Using platform cursor window size") }
+ 
+         AppContext.apply {
+             set(applicationContext)
+diff --git a/androidApp/src/main/res/drawable/ic_dhunora_launcher.xml b/androidApp/src/main/res/drawable/ic_dhunora_launcher.xml
+new file mode 100644
+index 0000000..e79d33a
+--- /dev/null
++++ b/androidApp/src/main/res/drawable/ic_dhunora_launcher.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++    <path
++        android:fillColor="#17131F"
++        android:pathData="M54,4 A50,50 0,1 1,53.9 4"/>
++    <path
++        android:fillColor="#B69CFF"
++        android:pathData="M54,14 A40,40 0,1 1,53.9 14"/>
++    <path
++        android:fillColor="#211044"
++        android:pathData="M65,28 L65,63 C61,60 57,59 53,59 C44,59 37,64 37,72 C37,80 44,85 53,85 C64,85 71,78 71,68 L71,42 L86,39 L86,29 Z M53,66 C58,66 62,68 62,72 C62,76 58,79 53,79 C48,79 44,76 44,72 C44,68 48,66 53,66 Z"/>
++</vector>
+\ No newline at end of file
+diff --git a/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher.xml b/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+index 7133c9c..0df6d26 100644
+--- a/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
++++ b/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+     <background android:drawable="@drawable/ic_launcher_background"/>
+-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
++    <foreground android:drawable="@drawable/ic_dhunora_launcher"/>
+     <monochrome android:drawable="@drawable/monochrome"/>
+ </adaptive-icon>
+\ No newline at end of file
+diff --git a/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml b/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+index c4a603d..67fe882 100644
+--- a/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
++++ b/androidApp/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+     <background android:drawable="@drawable/ic_launcher_background"/>
+-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
++    <foreground android:drawable="@drawable/ic_dhunora_launcher"/>
+ </adaptive-icon>
+\ No newline at end of file
+diff --git a/androidApp/src/main/res/values/app_name.xml b/androidApp/src/main/res/values/app_name.xml
+index 6c1cd66..9f4f359 100644
+--- a/androidApp/src/main/res/values/app_name.xml
++++ b/androidApp/src/main/res/values/app_name.xml
+@@ -1,3 +1,3 @@
+ <resources>
+-    <string name="app_name">SimpMusic</string>
++    <string name="app_name">Dhunora</string>
+ </resources>
+\ No newline at end of file
+diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/Cookies.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/Cookies.android.kt
+index 7d61584..4ef1a32 100644
+--- a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/Cookies.android.kt
++++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/Cookies.android.kt
+@@ -1,6 +1,27 @@
+ package com.maxrave.simpmusic.expect.ui
+ 
+ import android.view.ViewGroup
++import android.webkit.WebResourceError
++import android.webkit.WebResourceRequest
++import android.webkit.WebResourceResponse
++import android.webkit.RenderProcessGoneDetail
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.material3.Button
++import androidx.compose.material3.Text
++import androidx.compose.material3.LinearProgressIndicator
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.key
++import androidx.compose.runtime.rememberUpdatedState
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.dp
+ import android.webkit.CookieManager
+ import android.webkit.JsResult
+ import android.webkit.WebChromeClient
+@@ -19,7 +40,7 @@ actual fun createWebViewCookieManager(): WebViewCookieManager =
+         override fun getCookie(url: String): String {
+             val cookie = CookieManager.getInstance()
+             return if (cookie.hasCookies()) {
+-                cookie.getCookie(url)
++                cookie.getCookie(url).orEmpty()
+             } else {
+                 ""
+             }
+@@ -38,34 +59,95 @@ actual fun PlatformWebView(
+     aboveContent: @Composable (BoxScope.() -> Unit),
+     onPageFinished: (String) -> Unit,
+ ) {
+-    Box {
+-        AndroidView(
+-            factory = { ctx ->
+-                WebView(ctx).apply {
+-                    layoutParams =
+-                        ViewGroup.LayoutParams(
++    var failure by remember(initUrl) { mutableStateOf<String?>(null) }
++    var generation by remember(initUrl) { mutableStateOf(0) }
++    val pageFinished by rememberUpdatedState(onPageFinished)
++    Box(Modifier.fillMaxSize().background(Color.White)) {
++        key(initUrl, generation) {
++            AndroidView(
++                factory = { ctx ->
++                    WebView(ctx).apply {
++                        setBackgroundColor(android.graphics.Color.WHITE)
++                        layoutParams = ViewGroup.LayoutParams(
+                             ViewGroup.LayoutParams.MATCH_PARENT,
+                             ViewGroup.LayoutParams.MATCH_PARENT,
+                         )
+-                    webViewClient =
+-                        object : WebViewClient() {
+-                            override fun onPageFinished(
+-                                view: WebView?,
+-                                url: String?,
+-                            ) {
+-                                url?.let {
+-                                    onPageFinished(it)
++                        settings.javaScriptEnabled = true
++                        settings.domStorageEnabled = true
++                        settings.useWideViewPort = true
++                        settings.loadWithOverviewMode = true
++                        settings.setSupportMultipleWindows(false)
++                        settings.allowFileAccess = false
++                        settings.allowContentAccess = false
++                        CookieManager.getInstance().setAcceptCookie(true)
++                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
++                        webChromeClient = object : WebChromeClient() {
++                            override fun onProgressChanged(view: WebView?, progress: Int) {
++                                state.value = if (progress >= 100) WebViewState.Finished else WebViewState.Loading(progress)
++                            }
++                        }
++                        webViewClient = object : WebViewClient() {
++                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
++                                failure = null
++                                state.value = WebViewState.Loading(0)
++                            }
++                            override fun onPageFinished(view: WebView?, url: String?) {
++                                state.value = WebViewState.Finished
++                                CookieManager.getInstance().flush()
++                                if (failure == null) url?.let(pageFinished)
++                            }
++                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
++                                if (request?.isForMainFrame == true) {
++                                    failure = "Could not load sign-in. Check your connection and try again."
++                                    state.value = WebViewState.Finished
++                                }
++                            }
++                            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) {
++                                if (request?.isForMainFrame == true) {
++                                    failure = "The sign-in service is temporarily unavailable. Please try again."
++                                    state.value = WebViewState.Finished
+                                 }
+                             }
++                            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
++                                failure = "The sign-in page stopped. Tap Retry to reopen it."
++                                state.value = WebViewState.Finished
++                                return true
++                            }
++                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
++                                val scheme = request?.url?.scheme
++                                return scheme != "https" && scheme != "http"
++                            }
+                         }
+-                    settings.javaScriptEnabled = true
+-                    settings.domStorageEnabled = true
+-
+-                    loadUrl(initUrl)
+-                }
+-            },
+-            modifier = Modifier.fillMaxSize(),
+-        )
++                        loadUrl(initUrl)
++                    }
++                },
++                modifier = Modifier.fillMaxSize(),
++                onRelease = { view ->
++                    view.stopLoading()
++                    view.webChromeClient = null
++                    view.webViewClient = WebViewClient()
++                    view.removeAllViews()
++                    view.destroy()
++                },
++            )
++        }
++        if (state.value is WebViewState.Loading && failure == null) {
++            LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
++        }
++        failure?.let { message ->
++            Column(
++                Modifier.fillMaxSize().background(Color.White).padding(28.dp),
++                verticalArrangement = Arrangement.Center,
++                horizontalAlignment = Alignment.CenterHorizontally,
++            ) {
++                Text(message, color = Color.Black)
++                Button(onClick = {
++                    failure = null
++                    state.value = WebViewState.Loading(0)
++                    generation += 1
++                }, modifier = Modifier.padding(top = 16.dp)) { Text("Retry") }
++            }
++        }
+         aboveContent()
+     }
+ }
+diff --git a/composeApp/src/commonMain/composeResources/values-hi/strings.xml b/composeApp/src/commonMain/composeResources/values-hi/strings.xml
+index 1282482..86427f2 100644
+--- a/composeApp/src/commonMain/composeResources/values-hi/strings.xml
++++ b/composeApp/src/commonMain/composeResources/values-hi/strings.xml
+@@ -124,7 +124,7 @@
+     <string name="maxrave_dev">मैक्सरेव-देव</string>
+     <string name="buy_me_a_coffee">मुझे एक कॉफी खरीदें</string>
+     <string name="developer_blog">डेवलपर ब्लॉग</string>
+-    <string name="blog_promo_message">मैंने अभी-अभी अपना व्यक्तिगत ब्लॉग maxrave.dev शुरू किया है — इसमें मैं SimpMusic के पीछे की कहानी, संगीत-तकनीक से जुड़ी गहराई से की गई जानकारियाँ और अपने इंजीनियरिंग से जुड़े अनुभव व नोट्स साझा कर रहा हूँ। अगर आपको ऐसी चीज़ों के बारे में जानना पसंद है, तो एक बार ज़रूर पढ़िए ✨</string>
++    <string name="blog_promo_message">मैंने अभी-अभी अपना व्यक्तिगत ब्लॉग maxrave.dev शुरू किया है — इसमें मैं Dhunora के पीछे की कहानी, संगीत-तकनीक से जुड़ी गहराई से की गई जानकारियाँ और अपने इंजीनियरिंग से जुड़े अनुभव व नोट्स साझा कर रहा हूँ। अगर आपको ऐसी चीज़ों के बारे में जानना पसंद है, तो एक बार ज़रूर पढ़िए ✨</string>
+     <string name="paypal">पेयपाल</string>
+     <string name="title">शीर्षक</string>
+     <string name="album">एल्बम</string>
+@@ -272,7 +272,7 @@
+     <string name="older_first">पुराने पहले</string>
+     <string name="newer_first">नए पहले</string>
+     <string name="added_date">जोड़ने की तिथि</string>
+-    <string name="credit_app">बैकएंड के लिए YouTube Music का उपयोग करने वाला एक सरल संगीत ऐप \n\nSimpMusic YouTube और YouTube Music से बिना विज्ञापनों और ट्रैकिंग के संगीत स्ट्रीम करने के लिए एक ओपन सोर्स प्रोजेक्ट है। SimpMusic कई सुविधाएं प्रदान करता है:\n\n - संगीत स्ट्रीमिंग \n - सिंक किए गए गाने के बोल\n - व्यक्तिगत डेटा\n - और बहुत कुछ… \n\nSimpMusic हमेशा मुफ्त और बिना विज्ञापनों के है\n\nतुआन मिन्ह न्गुयेन डक (maxrave-dev) द्वारा ❤️ से बनाया गया</string>
++    <string name="credit_app">बैकएंड के लिए YouTube Music का उपयोग करने वाला एक सरल संगीत ऐप \n\nDhunora YouTube और YouTube Music से बिना विज्ञापनों और ट्रैकिंग के संगीत स्ट्रीम करने के लिए एक ओपन सोर्स प्रोजेक्ट है। Dhunora कई सुविधाएं प्रदान करता है:\n\n - संगीत स्ट्रीमिंग \n - सिंक किए गए गाने के बोल\n - व्यक्तिगत डेटा\n - और बहुत कुछ… \n\nDhunora हमेशा मुफ्त और बिना विज्ञापनों के है\n\nतुआन मिन्ह न्गुयेन डक (maxrave-dev) द्वारा ❤️ से बनाया गया</string>
+     <string name="issue_tracker">समस्या ट्रैकर</string>
+     <string name="featured_playlists">विशेष प्लेलिस्ट</string>
+     <string name="featured_inArtist">पर प्रदर्शित</string>
+@@ -311,7 +311,7 @@
+     <string name="enable_spotify_lyrics">Spotify लिरिक्स सक्षम करें</string>
+     <string name="spotify_lyrícs_info">बिना अनुवाद के अधिक गीत</string>
+     <string name="enable_canvas">कैनवास सक्षम करें</string>
+-    <string name="canvas_info">SimpMusic में Spotify कैनवास दिखाएं</string>
++    <string name="canvas_info">Dhunora में Spotify कैनवास दिखाएं</string>
+     <string name="spotify_lyrics_provider">गीत Spotify द्वारा प्रदान किए गए</string>
+     <string name="offline_mode">ऑफ़लाइन मोड</string>
+     <string name="added_to_youtube_liked">YouTube पसंदीदा में जोड़ा गया</string>
+@@ -360,7 +360,7 @@
+     <string name="loading">लोड हो रहा है</string>
+     <string name="updating">अपडेट हो रहा है</string>
+     <string name="go_to_log_in_page">लॉग इन पेज पर जाएं</string>
+-    <string name="log_in_warning">अब YouTube Music को संगीत स्ट्रीम करने के लिए आपको लॉग इन करने की आवश्यकता है, Piped इंस्टेंस कभी-कभी काम नहीं कर सकता है। आपको SimpMusic के साथ बेहतर अनुभव प्राप्त करने के लिए YouTube में लॉग इन करना चाहिए।</string>
++    <string name="log_in_warning">अब YouTube Music को संगीत स्ट्रीम करने के लिए आपको लॉग इन करने की आवश्यकता है, Piped इंस्टेंस कभी-कभी काम नहीं कर सकता है। आपको Dhunora के साथ बेहतर अनुभव प्राप्त करने के लिए YouTube में लॉग इन करना चाहिए।</string>
+     <string name="spotify_canvas_cache">स्पॉटिफाए कैनवास कैश</string>
+     <string name="clear_canvas_cache">कैनवास कैश साफ़ करें</string>
+     <string name="proxy">प्रॉक्सी</string>
+@@ -439,7 +439,7 @@
+     <string name="use_anonymous">अनाम नाम से योगदान करें</string>
+     <string name="contributor_name">योगदानकर्ता नाम</string>
+     <string name="anonymous">अनाम</string>
+-    <string name="simpmusic_lyrics">गीत SimpMusic Lyrics द्वारा प्रदान किए गए</string>
++    <string name="simpmusic_lyrics">गीत Dhunora Lyrics द्वारा प्रदान किए गए</string>
+     <string name="lyrics_provider_simpmusic">गीत के बोल सिम्पम्यूज़िक लिरिक्स द्वारा प्रदान किए गए</string>
+     <string name="backup_in_progress">बैकप चल रहा है</string>
+     <string name="restore_in_progress">पुनर्स्थापना प्रगति पर है</string>
+diff --git a/composeApp/src/commonMain/composeResources/values/app_name.xml b/composeApp/src/commonMain/composeResources/values/app_name.xml
+index e90fd15..c3bab65 100644
+--- a/composeApp/src/commonMain/composeResources/values/app_name.xml
++++ b/composeApp/src/commonMain/composeResources/values/app_name.xml
+@@ -1,4 +1,4 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name" translatable="false">SimpMusic</string>
++    <string name="app_name" translatable="false">Dhunora</string>
+ </resources>
+\ No newline at end of file
+diff --git a/composeApp/src/commonMain/composeResources/values/strings.xml b/composeApp/src/commonMain/composeResources/values/strings.xml
+index d0af52c..eeee0f2 100644
+--- a/composeApp/src/commonMain/composeResources/values/strings.xml
++++ b/composeApp/src/commonMain/composeResources/values/strings.xml
+@@ -126,7 +126,7 @@
+     <string name="developer_blog">Developer Blog</string>
+     <string name="developer_blog_tagline">Read dev notes, tutorials &amp; behind-the-scenes</string>
+     <string name="blog_promo_title">Something new from the dev</string>
+-    <string name="blog_promo_message">I just launched my personal blog at maxrave.dev — sharing the story behind SimpMusic, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
++    <string name="blog_promo_message">I just launched my personal blog at maxrave.dev — sharing the story behind Dhunora, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
+     <string name="visit_blog">Visit blog</string>
+     <string name="paypal">PayPal</string>
+     <string name="title">Title</string>
+@@ -145,7 +145,7 @@
+     <string name="albums_inArtist">Albums</string>
+     <string name="singles_inArtist">Singles</string>
+     <string name="fans_might_also_like_inArtist">Fans might also like</string>
+-    <string name="crash_log">SimpMusic crashed. Sorry for this problem.\nSend crash-log to developer</string>
++    <string name="crash_log">Dhunora crashed. Sorry for this problem.\nSend crash-log to developer</string>
+     <string name="crash">Crash</string>
+     <string name="send">Send</string>
+     <string name="mail_subject">Report Crash</string>
+@@ -204,12 +204,12 @@
+     <string name="save">Save</string>
+     <string name="crop_cover">Crop cover</string>
+     <string name="saved">Saved</string>
+-    <string name="sponsor_block_intro">SponsorBlock is a crowd-sourced system for skipping annoying parts of YouTube videos.\nMore information: https://sponsor.ajay.app/\nIn SimpMusic, SponsorBlock is only available when the device is online</string>
++    <string name="sponsor_block_intro">SponsorBlock is a crowd-sourced system for skipping annoying parts of YouTube videos.\nMore information: https://sponsor.ajay.app/\nIn Dhunora, SponsorBlock is only available when the device is online</string>
+     <string name="skip_sponsor_part_of_video">Skip sponsor part of video</string>
+     <string name="customactivityoncrash_error_activity_error_occurred_explanation">An unexpected error occurred. Sorry for the inconvenience.</string>
+     <string name="customactivityoncrash_error_activity_restart_app">Restart app</string>
+-    <string name="help_build_lyrics_database">Help SimpMusic lyrics build the lyrics database</string>
+-    <string name="help_build_lyrics_database_description">Send your saved lyrics to SimpMusic lyrics's database</string>
++    <string name="help_build_lyrics_database">Help Dhunora lyrics build the lyrics database</string>
++    <string name="help_build_lyrics_database_description">Send your saved lyrics to Dhunora lyrics's database</string>
+     <string name="customactivityoncrash_error_activity_close_app">Close app</string>
+     <string name="customactivityoncrash_error_activity_error_details">Error details</string>
+     <string name="customactivityoncrash_error_activity_error_details_title">Error details</string>
+@@ -227,7 +227,7 @@
+     <string name="sleep_timer_set_error">Please set the correct format time</string>
+     <string name="sleep_timer_warning">Remove sleep timer?</string>
+     <string name="yes">Yes</string>
+-    <string name="notification_channel_name" translatable="false">SimpMusic Playback Notification</string>
++    <string name="notification_channel_name" translatable="false">Dhunora Playback Notification</string>
+     <string name="welcome_back">Welcome back,</string>
+     <string name="upload_your_listening_history_to_youtube_music_server_it_will_make_yt_music_recommendation_system_better_working_only_if_logged_in">Upload your listening history to YouTube Music server, it will make YT Music recommendation system better. Working only if logged in</string>
+     <string name="send_back_listening_data_to_google">Send back listening data to Google</string>
+@@ -246,7 +246,7 @@
+     <string name="saved_to_local_playlist">Saved to local playlist</string>
+     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">if you want to unsync this playlist, please go to local playlist</string>
+     <string name="log_in_to_get_YouTube_playlist">Log in to get YouTube Playlist</string>
+-    <string name="sync_playlist_warning">SimpMusic will create a YouTube Music Playlist automatically. Are you sure?</string>
++    <string name="sync_playlist_warning">Dhunora will create a YouTube Music Playlist automatically. Are you sure?</string>
+     <string name="syncing">Syncing</string>
+     <string name="unsync_playlist_warning">"Unsync this playlist? This playlist will not be removed from YouTube Music "</string>
+     <string name="unsyncing">Unsyncing</string>
+@@ -263,7 +263,7 @@
+     <string name="email">Email</string>
+     <string name="password">Password</string>
+     <string name="please_enter_your_email_and_password">Please enter your email and password</string>
+-    <string name="translation_language_message">Type language code (Eg: en) (2 letters). If you want to set same with SimpMusic's language, please make edit box empty.</string>
++    <string name="translation_language_message">Type language code (Eg: en) (2 letters). If you want to set same with Dhunora's language, please make edit box empty.</string>
+     <string name="invalid_language_code">Invalid language code</string>
+     <string name="lyrics_provider_youtube">Lyrics provided by YouTube</string>
+     <string name="lyrics_provider_betterlyrics">Lyrics provided by BetterLyrics</string>
+@@ -282,7 +282,7 @@
+     <string name="older_first">Older First</string>
+     <string name="newer_first">Newer First</string>
+     <string name="added_date">Added date</string>
+-    <string name="credit_app">A simple music app using YouTube Music for backend \n\nSimpMusic is an open source project to stream music from YouTube and YouTube Music without ads and tracking. SimpMusic provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nSimpMusic is always free and no ads\n\nBuild with ❤️ from Tuan Minh Nguyen Duc (maxrave-dev)</string>
++    <string name="credit_app">A simple music app using YouTube Music for backend \n\nDhunora is an open source project to stream music from YouTube and YouTube Music without ads and tracking. Dhunora provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nDhunora is always free and no ads\n\nBuild with ❤️ from Tuan Minh Nguyen Duc (maxrave-dev)</string>
+     <string name="issue_tracker">Issue Tracker</string>
+     <string name="copyright" translatable="false">©2023-2025 Tuan Minh Nguyen Duc (maxrave-dev)</string>
+     <string name="featured_playlists">Featured Playlists</string>
+@@ -350,7 +350,7 @@
+     <string name="reverb_help_predelay_meaning">Pre-delay is the silence before the reverb starts. A longer gap keeps the dry sound clear and pushes the walls further away.</string>
+     <string name="reverb_help_damping_meaning">Damping is where the tail starts losing treble. It darkens further as it decays, the way air and soft surfaces absorb highs.</string>
+     <string name="reverb_help_mix">Mix is the wet share: the slider sets how much of the room you hear against the dry signal, identically on Android and Desktop.</string>
+-    <string name="sync_follow_to_youtube_description">Following an artist in SimpMusic also subscribes to their channel on your YouTube account</string>
++    <string name="sync_follow_to_youtube_description">Following an artist in Dhunora also subscribes to their channel on your YouTube account</string>
+     <string name="sync_follow_failed">Couldn't update your YouTube subscription</string>
+     <string name="subscribed_on_youtube">Subscribed on YouTube</string>
+     <string name="unsubscribed_on_youtube">Unsubscribed on YouTube</string>
+@@ -371,7 +371,7 @@
+     <string name="enable_spotify_lyrics">Enable Spotify Lyrics</string>
+     <string name="spotify_lyrícs_info">More lyrics without translation</string>
+     <string name="enable_canvas">Enable Canvas</string>
+-    <string name="canvas_info">Show Spotify Canvas in SimpMusic</string>
++    <string name="canvas_info">Show Spotify Canvas in Dhunora</string>
+     <string name="enable_animated_artwork">Animated artwork</string>
+     <string name="animated_artwork_info">Play the album's animated cover instead of a Canvas. No account needed. Albums without one keep the still cover.</string>
+     <string name="spotify_lyrics_provider">Lyrics provided by Spotify</string>
+@@ -457,7 +457,7 @@
+     <string name="loading">Loading</string>
+     <string name="updating">Updating</string>
+     <string name="go_to_log_in_page">Go to log in page</string>
+-    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can't work too. You should log in to YouTube to get better experience with SimpMusic.</string>
++    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can't work too. You should log in to YouTube to get better experience with Dhunora.</string>
+     <string name="spotify_canvas_cache">Spotify Canvas Cache</string>
+     <string name="clear_canvas_cache">Clear canvas cache</string>
+     <string name="listening_history">Listening history</string>
+@@ -507,12 +507,12 @@
+     <string name="other_version">Other version</string>
+     <string name="later">Later</string>
+     <string name="give_a_star">Give a star</string>
+-    <string name="enjoying_simpmusic">Enjoying SimpMusic</string>
+-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using SimpMusic, star SimpMusic on GitHub or leave a review on</string>
++    <string name="enjoying_simpmusic">Enjoying Dhunora</string>
++    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using Dhunora, star Dhunora on GitHub or leave a review on</string>
+     <string name="if_you_love_my_work_consider">"If you love my work, consider "</string>
+     <string name="buying_me_a_coffee">buying me a coffee.</string>
+     <string name="footguns_promo_title">Every trap I fell into</string>
+-    <string name="footguns_promo_message">SimpMusic cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don't lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
++    <string name="footguns_promo_message">Dhunora cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don't lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
+     <string name="fade_audio_effect">Fade audio effect</string>
+     <string name="disabled">Disable</string>
+     <string name="fade_audio_effect_duration">Fade audio effect duration (ms) (Set to 0 for disable)</string>
+@@ -568,14 +568,14 @@
+     <string name="contributor_name">Contributor name</string>
+     <string name="contributor_email">Contributor email</string>
+     <string name="anonymous">Anonymous</string>
+-    <string name="simpmusic_lyrics">SimpMusic Lyrics</string>
+-    <string name="lyrics_provider_simpmusic">Lyrics provided by SimpMusic Lyrics</string>
++    <string name="simpmusic_lyrics">Dhunora Lyrics</string>
++    <string name="lyrics_provider_simpmusic">Lyrics provided by Dhunora Lyrics</string>
+     <string name="backup_in_progress">Backup in progress</string>
+     <string name="restore_in_progress">Restore in progress</string>
+     <string name="backup_downloaded">Backup downloaded data</string>
+     <string name="backup_downloaded_description">Backup all downloaded songs's data</string>
+     <string name="auto_backup">Auto backup</string>
+-    <string name="auto_backup_description">Automatically backup your data to Downloads/SimpMusic folder</string>
++    <string name="auto_backup_description">Automatically backup your data to Downloads/Dhunora folder</string>
+     <string name="backup_frequency">Backup frequency</string>
+     <string name="daily">Daily</string>
+     <string name="weekly">Weekly</string>
+@@ -615,8 +615,8 @@
+     <string name="intro_login_to_lastfm">Log in to scrobble what you listen to</string>
+     <string name="enable_scrobbling">Enable scrobbling</string>
+     <string name="scrobbling_info">Send what you play to your Last.fm profile</string>
+-    <string name="lastfm_login_step_1">Open the Last.fm page and grant SimpMusic access to your account.</string>
+-    <string name="lastfm_login_step_2">SimpMusic opens again on its own once you have granted access.</string>
++    <string name="lastfm_login_step_1">Open the Last.fm page and grant Dhunora access to your account.</string>
++    <string name="lastfm_login_step_2">Dhunora opens again on its own once you have granted access.</string>
+     <string name="lastfm_open_authorize_page">Open Last.fm</string>
+     <string name="lastfm_login_failed">Could not log in to Last.fm. Please try again.</string>
+     <string name="lastfm_paste_callback_title">Did not come back automatically?</string>
+@@ -692,7 +692,7 @@
+     <string name="downvote">Downvote</string>
+     <string name="vote_submitted">Thank you for voting this lyrics!</string>
+     <string name="vote_error">Failed to submit</string>
+-    <string name="open_app">Open SimpMusic</string>
++    <string name="open_app">Open Dhunora</string>
+     <string name="close_miniplayer">Close Mini-player</string>
+     <string name="open_miniplayer">Open Mini-player</string>
+     <string name="quit_app">Quit app</string>
+@@ -700,7 +700,7 @@
+     <string name="local_tracking_description">Log your listening history to local database</string>
+     <string name="blog_notification_title">Blog post notifications</string>
+     <string name="blog_notification_description">Get notified when a new blog post is published</string>
+-    <string name="simpmusic_charts">SimpMusic Charts</string>
++    <string name="simpmusic_charts">Dhunora Charts</string>
+     <string name="crossfading">Crossfading</string>
+     <string name="your_320kbps_url">Your 320kbps URL</string>
+     <string name="your_320kbps_url_description">Leave empty to auto-choose a working URL from the uptime checker.</string>
+@@ -716,13 +716,13 @@
+     <string name="not_available_while_casting">Not available while casting</string>
+     <string name="import_data">Import playlists</string>
+     <string name="import_playlists_from_other_apps">Import playlists from another app</string>
+-    <string name="import_data_intro">Import brings in playlists converted from Spotify or another YT Music client app.\nConverting tool: https://www.simpmusic.org/tools\nIn SimpMusic, only playlist files in our own format can be imported</string>
++    <string name="import_data_intro">Import brings in playlists converted from Spotify or another YT Music client app.\nConverting tool: https://www.simpmusic.org/tools\nIn Dhunora, only playlist files in our own format can be imported</string>
+     <string name="import_reading_file">Reading file…</string>
+     <string name="import_progress_songs">%1$d of %2$d songs</string>
+     <string name="import_result">Created %1$d playlists and imported %2$d songs.</string>
+     <string name="import_result_skipped">%1$d entries were skipped because their song was missing from the file.</string>
+     <string name="import_failed">Import failed</string>
+-    <string name="import_invalid_file">This file is not a valid SimpMusic import file. Convert your library at simpmusic.org first.</string>
++    <string name="import_invalid_file">This file is not a valid Dhunora import file. Convert your library at simpmusic.org first.</string>
+     <string name="analytics">Analytics</string>
+     <string name="select_all">Select all</string>
+     <string name="n_selected">%1$d selected</string>
+@@ -796,7 +796,7 @@
+     <string name="wrapped_share">Share</string>
+     <string name="wrapped_save">Save</string>
+     <string name="wrapped_opening_title">Your year in music</string>
+-    <string name="wrapped_opening_lead">You opened SimpMusic on</string>
++    <string name="wrapped_opening_lead">You opened Dhunora on</string>
+     <string name="wrapped_opening_days">%1$s of %2$s days</string>
+     <string name="wrapped_opening_tracks">%1$s tracks went past.</string>
+     <string name="wrapped_minutes_title">You spent this much of the year listening</string>
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt
+index 7b590c2..317a676 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt
+@@ -753,7 +753,7 @@ fun App(
+                                 onClick = {
+                                     shouldShowUpdateDialog = false
+                                     viewModel.showedUpdateDialog = false
+-                                    openUrl("https://simpmusic.org/download")
++                                    openUrl("https://github.com/AlokGond/Dhunora/releases")
+                                 },
+                             ) {
+                                 Text(
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ReviewDialog.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ReviewDialog.kt
+index 736b1bd..220a176 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ReviewDialog.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ReviewDialog.kt
+@@ -40,7 +40,7 @@ fun ReviewDialog(
+         confirmButton = {
+             TextButton(onClick = {
+                 onDoneReview.invoke()
+-                uriHandler.openUri("https://github.com/maxrave-dev/SimpMusic")
++                uriHandler.openUri("https://github.com/AlokGond/Dhunora")
+             }) {
+                 Text(
+                     stringResource(Res.string.give_a_star),
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
+index 388302f..b963101 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
+@@ -2592,7 +2592,7 @@ fun SettingScreen(
+                         if (updateChannel == DataStoreManager.FDROID) {
+                             "F-Droid"
+                         } else {
+-                            "SimpMusic GitHub Release"
++                            "Dhunora GitHub Release"
+                         },
+                     onClick = {
+                         viewModel.setAlertData(
+@@ -2603,7 +2603,7 @@ fun SettingScreen(
+                                         listSelect =
+                                             listOf(
+                                                 (updateChannel == DataStoreManager.FDROID) to "F-Droid",
+-                                                (updateChannel == DataStoreManager.GITHUB) to "SimpMusic GitHub Release",
++                                                (updateChannel == DataStoreManager.GITHUB) to "Dhunora GitHub Release",
+                                             ),
+                                     ),
+                                 confirm =
+@@ -2611,7 +2611,7 @@ fun SettingScreen(
+                                         viewModel.setUpdateChannel(
+                                             when (state.selectOne?.getSelected()) {
+                                                 "F-Droid" -> DataStoreManager.FDROID
+-                                                "SimpMusic GitHub Release" -> DataStoreManager.GITHUB
++                                                "Dhunora GitHub Release" -> DataStoreManager.GITHUB
+                                                 else -> DataStoreManager.GITHUB
+                                             },
+                                         )
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/login/SpotifyLoginScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/login/SpotifyLoginScreen.kt
+index 27de09e..c69d2b8 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/login/SpotifyLoginScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/login/SpotifyLoginScreen.kt
+@@ -166,9 +166,9 @@ fun SpotifyLoginScreen(
+                     it.isNotEmpty()
+                 }?.let { cookie ->
+                     val cookies =
+-                        cookie.split("; ").map {
+-                            val (key, value) = it.split("=")
+-                            key to value
++                        cookie.split(';').mapNotNull {
++                            val parts = it.trim().split('=', limit = 2)
++                            if (parts.size == 2) parts[0] to parts[1] else null
+                         }
+                     viewModel.setFullSpotifyCookies(cookies)
+                 }
+@@ -184,7 +184,7 @@ fun SpotifyLoginScreen(
+                         }?.let {
+                             viewModel.saveSpotifySpdc(it)
+                         }
+-                    cookieManager.removeAllCookies()
++                    // Retain other service sessions; clearing the global cookie jar also logs YouTube out.
+                 }
+             }
+         }
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/other/CreditScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/other/CreditScreen.kt
+index 4216d91..cc040e2 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/other/CreditScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/other/CreditScreen.kt
+@@ -91,6 +91,13 @@ fun CreditScreen(
+             fontSize = 22.sp,
+         )
+ 
++        Text(
++            text = "Dhunora by Alok • Based on SimpMusic by maxrave-dev and contributors • GPL-3.0",
++            style = typo().bodySmall,
++            textAlign = TextAlign.Center,
++            modifier = Modifier.padding(horizontal = 25.dp, vertical = 12.dp),
++        )
++
+         // Version
+         Text(
+             text = stringResource(Res.string.version_format, VersionManager.getVersionName()),
+@@ -162,7 +169,7 @@ fun CreditScreen(
+             // GitHub button
+             TextButton(
+                 onClick = {
+-                    openUrl("https://github.com/maxrave-dev/SimpMusic")
++                    openUrl("https://github.com/AlokGond/Dhunora")
+                 },
+                 modifier =
+                     Modifier
+@@ -176,7 +183,7 @@ fun CreditScreen(
+             // Issue tracker button
+             TextButton(
+                 onClick = {
+-                    openUrl("https://github.com/maxrave-dev/SimpMusic/issues")
++                    openUrl("https://github.com/AlokGond/Dhunora/issues")
+                 },
+                 modifier =
+                     Modifier
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
+index 57cd2fd..58b9406 100644
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SearchViewModel.kt
+@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.collectLatest
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.update
+ import kotlinx.coroutines.launch
+-import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.Job
+ import org.jetbrains.compose.resources.StringResource
+ import simpmusic.composeapp.generated.resources.Res
+ import simpmusic.composeapp.generated.resources.albums
+@@ -112,12 +112,17 @@ class SearchViewModel(
+ 
+     private val requestedArtwork = mutableSetOf<String>()
+ 
++    private var searchJob: Job? = null
++    private var suggestionJob: Job? = null
++
+     var regionCode: String? = null
+     var language: String? = null
+ 
+     init {
+-        regionCode = runBlocking { dataStoreManager.location.first() }
+-        language = runBlocking { dataStoreManager.getString(SELECTED_LANGUAGE).first() }
++        viewModelScope.launch {
++            regionCode = dataStoreManager.location.first()
++            language = dataStoreManager.getString(SELECTED_LANGUAGE).first()
++        }
+         getSearchHistory()
+         getMoodAndGenres()
+     }
+@@ -188,8 +193,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchSongs(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataSong(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -210,8 +216,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchAll(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             var song = ArrayList<SongsResult>()
+             val video = ArrayList<VideosResult>()
+             var album = ArrayList<AlbumsResult>()
+@@ -337,7 +344,13 @@ class SearchViewModel(
+     }
+ 
+     fun suggestQuery(query: String) {
+-        viewModelScope.launch {
++        suggestionJob?.cancel()
++        if (query.isBlank()) {
++            _searchScreenState.update { it.copy(suggestQueries = emptyList(), suggestYTItems = emptyList()) }
++            return
++        }
++        suggestionJob = viewModelScope.launch {
++            delay(250)
+             searchRepository.getSuggestQuery(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -361,8 +374,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchAlbums(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataAlbum(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -386,8 +400,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchFeaturedPlaylist(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataFeaturedPlaylist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -411,8 +426,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchPodcast(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataPodcast(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -436,8 +452,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchArtists(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataArtist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -461,8 +478,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchPlaylists(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataPlaylist(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+@@ -486,8 +504,9 @@ class SearchViewModel(
+     }
+ 
+     fun searchVideos(query: String) {
++        searchJob?.cancel()
+         _searchScreenUIState.value = SearchScreenUIState.Loading
+-        viewModelScope.launch {
++        searchJob = viewModelScope.launch {
+             searchRepository.getSearchDataVideo(query).collect { values ->
+                 when (values) {
+                     is Resource.Success -> {
+diff --git a/gradle/gradle-daemon-jvm.properties b/gradle/gradle-daemon-jvm.properties
+index 8918ccd..5a1672f 100644
+--- a/gradle/gradle-daemon-jvm.properties
++++ b/gradle/gradle-daemon-jvm.properties
+@@ -9,5 +9,4 @@ toolchainUrl.UNIX.AARCH64=https\://api.foojay.io/disco/v3.0/ids/3d1170c4a2befa97
+ toolchainUrl.UNIX.X86_64=https\://api.foojay.io/disco/v3.0/ids/ca83b5b0bec882d8b275143b559827cc/redirect
+ toolchainUrl.WINDOWS.AARCH64=https\://api.foojay.io/disco/v3.0/ids/94348e25b52626019fb834c17f3e4f7f/redirect
+ toolchainUrl.WINDOWS.X86_64=https\://api.foojay.io/disco/v3.0/ids/b0969eea61055d4bb6628e83c68a2359/redirect
+-toolchainVendor=MICROSOFT
+ toolchainVersion=21
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index c94d3e0..813ab25 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -1,7 +1,7 @@
+ [versions]
+ # App version
+-version-name = "2.1.0"
+-version-code = "58"
++version-name = "1.0.0"
++version-code = "100"
+ 
+ android = "9.2.1"
+ kotlin = "2.4.10"
+@@ -82,7 +82,7 @@
+ material3-multiplatform = "1.12.0-alpha01" # alpha01 = skiko 0.148.1 (has Matrix33.makeTranslate) to match compottie 1.12 snapshot; alpha02 bumps skiko 0.148.2 which removed it → compottie crash
+ adaptive = "1.2.0"
+ componentsResources = "1.11.1"
+-compottie = "2.2.2-compose-1.12-SNAPSHOT" # Compose 1.12 / skiko 0.148.2 snapshot — material3 1.12-alpha forces skiko 0.148.2, stable compottie needs 0.144.6 and crashes
++compottie = "2.3.1" # Published Compose 1.12-compatible release; do not depend on an expired snapshot.
+ cmptoast = "1.0.71"
+ uri = "0.0.21"
+ buildkonfig = "0.22.0"

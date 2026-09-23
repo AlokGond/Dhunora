@@ -1,0 +1,73 @@
+diff --git a/common/src/commonMain/kotlin/com/maxrave/common/AppIdentity.kt b/common/src/commonMain/kotlin/com/maxrave/common/AppIdentity.kt
+index 951c262..405c591 100644
+--- a/common/src/commonMain/kotlin/com/maxrave/common/AppIdentity.kt
++++ b/common/src/commonMain/kotlin/com/maxrave/common/AppIdentity.kt
+@@ -7,5 +7,5 @@ data class AppIdentity(
+     val platform: String,
+ ) {
+     val userAgent: String
+-        get() = "SimpMusic/$versionName ($applicationId; $platform)"
++        get() = "Dhunora/$versionName ($applicationId; $platform)"
+ }
+diff --git a/data/src/commonMain/kotlin/com/maxrave/data/repository/UpdateRepositoryImpl.kt b/data/src/commonMain/kotlin/com/maxrave/data/repository/UpdateRepositoryImpl.kt
+index b502560..bfb6bd8 100644
+--- a/data/src/commonMain/kotlin/com/maxrave/data/repository/UpdateRepositoryImpl.kt
++++ b/data/src/commonMain/kotlin/com/maxrave/data/repository/UpdateRepositoryImpl.kt
+@@ -31,27 +31,6 @@ internal class UpdateRepositoryImpl(
+                 }
+         }.flowOn(Dispatchers.IO)
+ 
+-    override fun checkForFdroidUpdate(): Flow<Resource<UpdateData>> =
+-        flow {
+-            youTube
+-                .checkForFdroidUpdate()
+-                .onSuccess { response ->
+-                    val latestVersion = response.packages.maxBy { it.versionCode }
+-                    emit(
+-                        Resource.Success(
+-                            UpdateData(
+-                                tagName = latestVersion.versionName,
+-                                releaseTime = null,
+-                                body =
+-                                    $$"""
+-                                    ### Update via F-Droid, changelogs: 
+-                                    - https://github.com/maxrave-dev/SimpMusic/blob/dev/fastlane/metadata/android/en-US/changelogs/$${latestVersion.versionCode}.txt
+-                                    """.trimIndent(),
+-                            ),
+-                        ),
+-                    )
+-                }.onFailure {
+-                    emit(Resource.Error<UpdateData>(it.localizedMessage ?: "Unknown error"))
+-                }
+-        }.flowOn(Dispatchers.IO)
+-}
+\ No newline at end of file
++    override fun checkForFdroidUpdate(): Flow<Resource<UpdateData>> = checkForGithubReleaseUpdate()
++
++}
+diff --git a/service/kizzy/src/commonMain/kotlin/com/my/kizzy/DiscordRPC.kt b/service/kizzy/src/commonMain/kotlin/com/my/kizzy/DiscordRPC.kt
+index ee2b513..58d0ce7 100644
+--- a/service/kizzy/src/commonMain/kotlin/com/my/kizzy/DiscordRPC.kt
++++ b/service/kizzy/src/commonMain/kotlin/com/my/kizzy/DiscordRPC.kt
+@@ -35,7 +35,7 @@ class DiscordRPC(
+             buttons =
+                 listOf(
+                     "Listen on SimpMusic" to "https://simpmusic.org/app/watch?v=${song.videoId}",
+-                    "Visit SimpMusic" to "https://github.com/maxrave-dev/SimpMusic",
++                    "Visit Dhunora" to "https://github.com/AlokGond/Dhunora",
+                 ),
+             type = Type.LISTENING,
+             since = currentTime,
+diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/Ytmusic.kt b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/Ytmusic.kt
+index 20459ea..2642cd0 100644
+--- a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/Ytmusic.kt
++++ b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/Ytmusic.kt
+@@ -654,7 +654,7 @@ class Ytmusic {
+         }
+ 
+     suspend fun checkForGithubReleaseUpdate() =
+-        httpClient.get("https://api.github.com/repos/maxrave-dev/SimpMusic/releases/latest") {
++        httpClient.get("https://api.github.com/repos/AlokGond/Dhunora/releases/latest") {
+             contentType(ContentType.Application.Json)
+         }
+ 
