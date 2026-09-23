@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-lyrics"))
     implementation(project(":core-scraper"))
+    implementation(project(":core-ktorext"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
@@ -43,6 +44,7 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.sqlite:sqlite-bundled:2.7.0")
     ksp("androidx.room:room-compiler:2.8.4")
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.2.1")

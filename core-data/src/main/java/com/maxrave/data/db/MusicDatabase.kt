@@ -6,8 +6,9 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.room.execSQL
+import androidx.sqlite.execSQL
 import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteConnection
 import com.maxrave.common.DB_NAME
 import org.koin.core.context.GlobalContext
 import com.maxrave.domain.data.entities.AlbumEntity

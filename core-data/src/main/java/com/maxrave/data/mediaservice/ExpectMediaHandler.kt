@@ -16,3 +16,11 @@ fun createMediaServiceHandler(
     analyticsRepository: AnalyticsRepository,
     coroutineScope: kotlinx.coroutines.CoroutineScope,
 ): com.maxrave.domain.mediaservice.handler.MediaPlayerHandler =
+    MediaServiceHandlerImpl(
+        dataStoreManager,
+        songRepository,
+        streamRepository,
+        localPlaylistRepository,
+        analyticsRepository,
+        coroutineScope,
+    )

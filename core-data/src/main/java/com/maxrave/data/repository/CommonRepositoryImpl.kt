@@ -11,6 +11,7 @@ import com.maxrave.domain.repository.CommonRepository
 import com.maxrave.kotlinytmusicscraper.YouTube
 import com.maxrave.kotlinytmusicscraper.models.YouTubeLocale
 import com.maxrave.logger.Logger
+import com.maxrave.spotify.Spotify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -26,6 +27,12 @@ import okio.IOException
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+import android.webkit.CookieManager
+import java.io.File
+import java.net.Authenticator
+import java.net.PasswordAuthentication
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
