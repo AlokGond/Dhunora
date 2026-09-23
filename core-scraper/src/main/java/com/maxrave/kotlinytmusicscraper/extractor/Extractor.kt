@@ -1,7 +1,20 @@
 package com.maxrave.kotlinytmusicscraper.extractor
 
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import com.maxrave.kotlinytmusicscraper.models.SongItem
 import com.maxrave.kotlinytmusicscraper.models.response.DownloadProgress
+import com.maxrave.logger.Logger
+import dev.maxrave.pipepipe.extractor.NewPipe
+import dev.maxrave.pipepipe.extractor.ServiceList
+import dev.maxrave.pipepipe.extractor.services.youtube.YoutubeApiDecoder
+import dev.maxrave.pipepipe.extractor.stream.StreamInfo
+import okio.FileSystem
+import okio.IOException
+import okio.Path.Companion.toPath
+import org.schabi.newpipe.extractor.NewPipe as BraveNewPipe
+import org.schabi.newpipe.extractor.ServiceList as BraveServiceList
+import org.schabi.newpipe.extractor.stream.StreamInfo as BraveStreamInfo
 
 class Extractor {
     private var newPipeDownloader = NewPipeDownloaderImpl(proxy = null)

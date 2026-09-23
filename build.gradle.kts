@@ -10,5 +10,13 @@ plugins {
 subprojects {
     configurations.all {
         exclude(group = "com.google.protobuf", module = "protobuf-javalite")
+        // PipePipe and Brave both depend on com.github.TeamNewPipe:nanojson with different commit
+        // hashes. Gradle's default resolver picks PipePipe's older 1d9e1aea... commit which lacks
+        // JsonArray.streamAsJsonObjects(), causing NoSuchMethodError when Brave's fallback runs at
+        // runtime. Force the latest upstream commit (newer than both libs ship) across every module
+        // so the merged APK carries a nanojson with the API both extractors expect.
+        resolutionStrategy {
+            force("com.github.TeamNewPipe:nanojson:c7a6c1c08d16b6d5ecded34758e6415e07be2166")
+        }
     }
 }

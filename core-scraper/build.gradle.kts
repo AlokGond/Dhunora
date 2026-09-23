@@ -48,4 +48,8 @@ dependencies {
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.1")
     // XML (upstream resolves xmlutil transitively via ktor-xml)
     implementation("io.ktor:ktor-serialization-kotlinx-xml:3.5.2")
+    // Protobuf content negotiation (Ytmusic client)
+    implementation("io.ktor:ktor-serialization-kotlinx-protobuf:3.5.2")
+    // FFmpegKit for download post-processing (upstream androidMain)
+    implementation("io.github.maxrave-dev:ffmpeg-kit-audio:6.0.1")
 }
