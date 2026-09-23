@@ -1,6 +1,11 @@
 package com.maxrave.ktorext.crypto
 
-class Hmac actual constructor(algorithm: String, secretKey: String) {
+import java.time.Instant
+import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+
+class Hmac constructor(algorithm: String, secretKey: String) {
     private var tokenTtl: Long = 300000 // 5 minutes in milliseconds
     private val mac: Mac by lazy {
         try {
@@ -19,21 +24,8 @@ class Hmac actual constructor(algorithm: String, secretKey: String) {
         return hmac to timestamp
     }
 
-    /**
-     * Generate HMAC token for given data
-     *
-     * @param data The data to generate HMAC for
-     * @return Base64 encoded HMAC token
-     */
     fun generateHmac(data: String): String = Base64.getEncoder().encodeToString(mac.doFinal(data.toByteArray()))
 
-    /**
-     * Validate HMAC token for given data
-     *
-     * @param data The data that was used to generate HMAC
-     * @param hmac The HMAC token to validate
-     * @return True if HMAC is valid, false otherwise
-     */
     fun validateHmac(
         data: String,
         hmac: String,
@@ -42,12 +34,6 @@ class Hmac actual constructor(algorithm: String, secretKey: String) {
         return calculatedHmac == hmac
     }
 
-    /**
-     * Validate timestamp to prevent replay attacks
-     *
-     * @param timestamp The timestamp to validate (in milliseconds)
-     * @return True if timestamp is within allowed time window
-     */
     fun isValidTimestamp(timestamp: String): Boolean {
         val requestTime = timestamp.toLongOrNull() ?: return false
         val currentTime = System.currentTimeMillis()

@@ -23,6 +23,8 @@ dependencies {
     implementation(project(":core-domain"))
     implementation("io.ktor:ktor-client-core:3.5.2")
     implementation("io.ktor:ktor-client-okhttp:3.5.2")
+    implementation("io.ktor:ktor-client-encoding:3.5.2")
+    implementation("org.brotli:dec:0.1.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.7.0")
 }

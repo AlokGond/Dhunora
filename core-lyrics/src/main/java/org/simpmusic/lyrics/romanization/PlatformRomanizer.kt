@@ -1,5 +1,12 @@
 package org.simpmusic.lyrics.romanization
 
+import com.atilika.kuromoji.ipadic.Tokenizer
+import net.sourceforge.pinyin4j.PinyinHelper
+import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType
+import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType
+
 /**
  * The two scripts that cannot be transliterated by rule, and therefore need a platform library.
  *
