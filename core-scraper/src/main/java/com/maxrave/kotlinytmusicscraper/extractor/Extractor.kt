@@ -17,6 +17,9 @@ import org.schabi.newpipe.extractor.ServiceList as BraveServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfo as BraveStreamInfo
 
 class Extractor {
+    private val TAG = "Extractor"
+    private val LOCAL_TIER = "local"
+    private val REMOTE_TIER = "remote"
     private var newPipeDownloader = NewPipeDownloaderImpl(proxy = null)
     private var braveNewPipeDownloader = BraveNewPipeDownloaderImpl(proxy = null)
     private val faradayDecoder = FaradayJsDecoder()
