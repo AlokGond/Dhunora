@@ -1,23 +1,57 @@
 package com.alok.dhunora
 
 import android.app.Application
+import android.database.CursorWindow
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.crossfade
-import com.alok.dhunora.network.OkHttpDownloader
+import com.alok.dhunora.ui.di.viewModelModule
+import com.maxrave.common.AppIdentity
+import com.maxrave.data.di.loader.loadAllModules
+import multiplatform.network.cmptoast.AppContext
 import okhttp3.OkHttpClient
-import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.localization.ContentCountry
-import org.schabi.newpipe.extractor.localization.Localization
+import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidLogger
+import org.koin.core.context.loadKoinModules
+import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 import java.util.concurrent.TimeUnit
 
 class DhunoraApplication : Application(), SingletonImageLoader.Factory {
+
+    @OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
-        NewPipe.init(OkHttpDownloader(this), Localization("en", "IN"), ContentCountry("IN"))
+        startKoin {
+            androidLogger(level = Level.DEBUG)
+            androidContext(this@DhunoraApplication)
+            loadAllModules(
+                AppIdentity(
+                    applicationId = "com.alok.dhunora",
+                    versionName = "0.19.0",
+                    platform = "Android ${android.os.Build.VERSION.RELEASE}",
+                ),
+            )
+            loadKoinModules(viewModelModule)
+        }
+        // Load the Media3 service module (player backend DI)
+        com.maxrave.media3.di.loadMediaService()
+
+        try {
+            val field: java.lang.reflect.Field = CursorWindow::class.java.getDeclaredField("sCursorWindowSize")
+            field.isAccessible = true
+            field.set(null, 100 * 1024 * 1024)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        AppContext.apply {
+            set(applicationContext)
+        }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
@@ -35,6 +69,12 @@ class DhunoraApplication : Application(), SingletonImageLoader.Factory {
                         }
                     )
                 )
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(okio.Path.Companion.get(context.cacheDir.resolve("image_cache").absolutePath))
+                    .maxSizeBytes(512L * 1024 * 1024)
+                    .build()
             }
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
