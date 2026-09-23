@@ -1,7 +1,7 @@
 package com.maxrave.ktorext.crypto
 
 import java.time.Instant
-import java.util.Base64
+import java.util.*
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -24,8 +24,21 @@ class Hmac constructor(algorithm: String, secretKey: String) {
         return hmac to timestamp
     }
 
+    /**
+     * Generate HMAC token for given data
+     *
+     * @param data The data to generate HMAC for
+     * @return Base64 encoded HMAC token
+     */
     fun generateHmac(data: String): String = Base64.getEncoder().encodeToString(mac.doFinal(data.toByteArray()))
 
+    /**
+     * Validate HMAC token for given data
+     *
+     * @param data The data that was used to generate HMAC
+     * @param hmac The HMAC token to validate
+     * @return True if HMAC is valid, false otherwise
+     */
     fun validateHmac(
         data: String,
         hmac: String,
@@ -34,16 +47,15 @@ class Hmac constructor(algorithm: String, secretKey: String) {
         return calculatedHmac == hmac
     }
 
+    /**
+     * Validate timestamp to prevent replay attacks
+     *
+     * @param timestamp The timestamp to validate (in milliseconds)
+     * @return True if timestamp is within allowed time window
+     */
     fun isValidTimestamp(timestamp: String): Boolean {
         val requestTime = timestamp.toLongOrNull() ?: return false
         val currentTime = System.currentTimeMillis()
         return (currentTime - requestTime) < tokenTtl
     }
-}
-
-object HmacUri {
-    const val BASE_HMAC_URI = "/v1"
-    const val TRANSLATED_HMAC_URI = "/v1/translated"
-    const val VOTE_HMAC_URI = "/v1/vote"
-    const val VOTE_TRANSLATED_HMAC_URI = "/v1/translated/vote"
 }

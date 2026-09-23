@@ -1,13 +1,12 @@
 package org.simpmusic.lyrics.romanization
 
+import java.io.File
+
 /**
- * The Japanese analyzer's dictionary pack, on platforms where it is not part of the app.
- *
- * kuromoji's ipadic dictionary is ~13 MB of `.bin` resources. On Android those are excluded from
- * the APK and fetched once, on demand; on Desktop they still ship on the classpath, and iOS has no
- * analyzer at all — both of those answer [isReady] with true so nothing upstream ever asks them to
- * download. Same expect/actual shape as [PlatformRomanizer], which is this module's existing way
- * of splitting the two platform-bound romanizers from the ten pure-Kotlin ones.
+ * Android is the one platform where the dictionary genuinely lives outside the app, so this is
+ * the one actual with state: the configured directory, held here and read by [PlatformRomanizer]
+ * when it decides whether it can build the analyzer. The heavy lifting — download, checksum,
+ * unpacking, the kuromoji resolver — is all [KuromojiDictionary]'s.
  */
 object RomanizationDictionaryPack {
     /** Written once at startup by the repository's constructor, read on every romanize of a Japanese line. */
@@ -24,7 +23,7 @@ object RomanizationDictionaryPack {
         return KuromojiDictionary.isReady(directory)
     }
 
-    actual suspend fun download(): Result<Unit> {
+     suspend fun download(): Result<Unit> {
         val directory =
             dictionaryDirectory
                 ?: return Result.failure(IllegalStateException("RomanizationDictionaryPack.configure was never called"))

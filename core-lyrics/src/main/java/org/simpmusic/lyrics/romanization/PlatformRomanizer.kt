@@ -8,18 +8,12 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinToneType
 import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType
 
 /**
- * The two scripts that cannot be transliterated by rule, and therefore need a platform library.
+ * Japanese and Chinese romanization on Android.
  *
- * Everything else in this package is arithmetic or a table and lives in commonMain. These two are
- * different in kind:
- *
- *  - **Japanese** — a kanji's reading depends on the words around it (生 is *nama*, *sei*, *i* or
- *    *u* depending on context), so this needs a morphological analyzer, not a lookup.
- *  - **Chinese** — heteronyms need the surrounding WORD to disambiguate (行 is *xíng* or *háng*),
- *    which a per-character table cannot see.
- *
- * Both return null when the platform has no implementation, and null means "leave the line as it
- * is" rather than "error". That is what lets iOS compile with no library at all.
+ * No longer identical to the jvm actual: desktop keeps building the plain classpath `Tokenizer()`,
+ * while here the ipadic dictionary is not in the APK at all — it arrives by download (see
+ * [KuromojiDictionary]) and the analyzer can only be built once every file is on disk. Until then
+ * [japanese] answers null, which the pipeline already treats as "show nothing extra".
  */
 internal object PlatformRomanizer {
     // Loading the ipadic dictionary costs real time and memory, so it happens once, on first use —
