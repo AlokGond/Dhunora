@@ -1,7 +1,6 @@
 package com.maxrave.data.db
 
 import DatabaseDao
-import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -43,55 +42,6 @@ import com.maxrave.domain.data.entities.analytics.PlaybackEventEntity
     ],
     version = 26,
     exportSchema = true,
-    autoMigrations = [
-        AutoMigration(from = 2, to = 3), AutoMigration(
-            from = 1,
-            to = 3,
-        ), AutoMigration(from = 3, to = 4), AutoMigration(from = 2, to = 4), AutoMigration(
-            from = 3,
-            to = 5,
-        ), AutoMigration(4, 5), AutoMigration(6, 7), AutoMigration(
-            7,
-            8,
-            spec = AutoMigration7_8::class,
-        ), AutoMigration(8, 9),
-        AutoMigration(9, 10),
-        AutoMigration(from = 11, to = 12, spec = AutoMigration11_12::class),
-        AutoMigration(13, 14),
-        AutoMigration(14, 15),
-        AutoMigration(15, 16),
-        AutoMigration(16, 17),
-        AutoMigration(17, 18),
-        AutoMigration(16, 18),
-        AutoMigration(15, 18),
-        AutoMigration(18, 19),
-        AutoMigration(17, 19),
-        AutoMigration(16, 19),
-        AutoMigration(19, 20),
-        AutoMigration(18, 20),
-        AutoMigration(17, 20),
-        AutoMigration(20, 21),
-        AutoMigration(19, 21),
-        AutoMigration(18, 21),
-        AutoMigration(21, 22),
-        AutoMigration(20, 22),
-        AutoMigration(19, 22),
-        AutoMigration(22, 23),
-        AutoMigration(21, 23),
-        AutoMigration(20, 23),
-        AutoMigration(23, 24),
-        AutoMigration(22, 24),
-        AutoMigration(21, 24),
-        // 25 adds the AutoEq cache. Three new tables and nothing else, so Room generates
-        // the migration itself — no spec, and no path by which existing rows can be touched.
-        AutoMigration(24, 25),
-        AutoMigration(23, 25),
-        AutoMigration(22, 25),
-        // 26 adds GoogleAccountEntity.authUser (NOT NULL, SQL default 0), nothing else.
-        AutoMigration(25, 26),
-        AutoMigration(24, 26),
-        AutoMigration(23, 26),
-    ],
 )
 @TypeConverters(Converters::class)
 abstract class MusicDatabase : RoomDatabase() {
