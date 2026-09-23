@@ -4,3 +4,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
     id("com.google.devtools.ksp") version "2.3.11" apply false
 }
+
+// protobuf-java (full) is a strict superset of protobuf-javalite (identical class
+// FQNs); drop javalite everywhere to fix :app:checkReleaseDuplicateClasses.
+subprojects {
+    configurations.all {
+        exclude(group = "com.google.protobuf", module = "protobuf-javalite")
+    }
+}
