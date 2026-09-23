@@ -1992,19 +1992,8 @@ data class SettingBasicAlertState(
     val dismiss: String,
 )
 
-expect suspend fun calculateDataFraction(cacheRepository: CacheRepository): SettingsStorageSectionFraction?
 
-expect suspend fun restoreNative(
-    commonRepository: CommonRepository,
-    uri: Uri,
-    getData: () -> Unit = {},
-)
 
-expect suspend fun backupNative(
-    commonRepository: CommonRepository,
-    uri: Uri,
-    backupDownloaded: Boolean,
-)
 
 fun getPackageName(): String {
     val application: Context = getKoin().get()
