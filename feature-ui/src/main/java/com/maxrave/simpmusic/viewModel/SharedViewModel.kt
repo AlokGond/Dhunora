@@ -145,9 +145,404 @@ class SharedViewModel(
     private var _format: MutableStateFlow<NewFormatEntity?> = MutableStateFlow(null)
     val format: SharedFlow<NewFormatEntity?> = _format.asSharedFlow()
 
-    fun showNotificationPermissionDialog() {
-        _showNotificationPermissionDialog.value = true
+    /**
+     * Which extractor and cipher decoder produced the current track's URLs, shown in the info sheet.
+     *
+     * Read alongside the format rather than stored with it: the format row is cached and reused,
+     * while this describes the extraction that happened in this run of the app.
+     */
+    private val _extractSource: MutableStateFlow<String?> = MutableStateFlow(null)
+    val extractSource: StateFlow<String?> = _extractSource.asStateFlow()
+
+    private var _canvas: MutableStateFlow<CanvasResult?> = MutableStateFlow(null)
+    val canvas: StateFlow<CanvasResult?> = _canvas
+
+    private var canvasJob: Job? = null
+
+    private val _showNotificationPermissionDialog = MutableStateFlow(false)
+    val showNotificationPermissionDialog: StateFlow<Boolean> = _showNotificationPermissionDialog
+
+    private val _isOfficialBuild = MutableStateFlow(true)
+    val isOfficialBuild: StateFlow<Boolean> = _isOfficialBuild
+
+    // One-shot: the Desktop capsule asks the Now Playing panel, which hosts the page, to open
+    // full-screen lyrics. The panel consumes it once shown.
+    private val _fullscreenLyricsRequest = MutableStateFlow(false)
+    val fullscreenLyricsRequest: StateFlow<Boolean> = _fullscreenLyricsRequest
+
+    fun requestFullscreenLyrics() {
+        _fullscreenLyricsRequest.value = true
     }
+
+    fun consumeFullscreenLyricsRequest() {
+        _fullscreenLyricsRequest.value = false
+    }
+
+    private var getFormatFlowJob: Job? = null
+
+    var playlistId: MutableStateFlow<String?> = MutableStateFlow(null)
+
+    var isFullScreen: Boolean = false
+
+    private var _nowPlayingState = MutableStateFlow<NowPlayingTrackState?>(null)
+    val nowPlayingState: StateFlow<NowPlayingTrackState?> = _nowPlayingState
+
+    fun getQueueDataState() = mediaPlayerHandler.queueData
+
+    val castState: StateFlow<GenericCastState> get() = mediaPlayerHandler.castState
+
+    private var _controllerState =
+        MutableStateFlow<ControlState>(
+            ControlState(
+                isPlaying = false,
+                isShuffle = false,
+                repeatState = RepeatState.None,
+                isLiked = false,
+                isNextAvailable = false,
+                isPreviousAvailable = false,
+                isCrossfading = false,
+                volume = 1f,
+            ),
+        )
+    val controllerState: StateFlow<ControlState> = _controllerState
+    private val _getVideo: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val getVideo: StateFlow<Boolean> = _getVideo
+
+    private var _timeline =
+        MutableStateFlow<TimeLine>(
+            TimeLine(
+                current = -1L,
+                total = -1L,
+                bufferedPercent = 0,
+                loading = true,
+            ),
+        )
+    val timeline: StateFlow<TimeLine> = _timeline
+
+    private var _nowPlayingScreenData =
+        MutableStateFlow<NowPlayingScreenData>(
+            NowPlayingScreenData.initial(),
+        )
+    val nowPlayingScreenData: StateFlow<NowPlayingScreenData> = _nowPlayingScreenData
+
+    private var _likeStatus = MutableStateFlow<Boolean>(false)
+    val likeStatus: StateFlow<Boolean> = _likeStatus
+
+    /**
+     * Which body of the Apple Music player was open last — held by ENUM NAME so this class stays
+     * ignorant of the UI enum, which is internal to the player package.
+     *
+     * It cannot live in the composable: that player is inside a ModalBottomSheet, so dismissing
+     * the sheet disposes the whole tree and takes any rememberSaveable with it — the tab snapped
+     * back to the artwork every single time it was reopened. This class is a Koin `single`, so it
+     * outlives the sheet while still resetting on app restart, which is the right lifetime for
+     * "where I was a moment ago".
+     */
+    private val _lastPlayerViewTab = MutableStateFlow<String?>(null)
+    val lastPlayerViewTab: StateFlow<String?> = _lastPlayerViewTab
+
+    fun setLastPlayerViewTab(tabName: String) {
+        _lastPlayerViewTab.value = tabName
+    }
+
+    val openAppTime: StateFlow<Int> = dataStoreManager.openAppTime.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
+    private val _shareSavedLyrics: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    val shareSavedLyrics: StateFlow<Boolean> get() = _shareSavedLyrics
+
+    init {
+        viewModelScope.launch {
+            log("SharedViewModel init")
+            if (dataStoreManager.appVersion.first() != VersionManager.getVersionName()) {
+                dataStoreManager.resetOpenAppTime()
+                dataStoreManager.putString(FOOTGUNS_STAR_KEY, "false")
+                dataStoreManager.setAppVersion(
+                    VersionManager.getVersionName(),
+                )
+            }
+            dataStoreManager.openApp()
+            val timeLineJob =
+                launch {
+                    nowPlayingState
+                        .filterNotNull()
+                        .flatMapLatest { nowPlayingState ->
+                            timeline.map { timeLine ->
+                                Pair(timeLine, nowPlayingState)
+                            }
+                        }.distinctUntilChanged { old, new ->
+                            (old.first.total.toString() + old.second.songEntity?.videoId).hashCode() ==
+                                (new.first.total.toString() + new.second.songEntity?.videoId).hashCode()
+                        }.collectLatest {
+                            log("Timeline job ${(it.first.total.toString() + it.second.songEntity?.videoId).hashCode()}")
+                            val nowPlaying = it.second
+                            val timeline = it.first
+                            if (timeline.total > 0 && nowPlaying.songEntity != null) {
+                                if (nowPlaying.mediaItem.isSong() && nowPlayingScreenData.value.canvasData == null) {
+                                    Logger.w(tag, "Duration is ${timeline.total}")
+                                    Logger.w(tag, "MediaId is ${nowPlaying.mediaItem.mediaId}")
+                                    getCanvas(nowPlaying.mediaItem.mediaId, (timeline.total / 1000).toInt())
+                                }
+                                nowPlaying.songEntity?.let { song ->
+                                    if (nowPlayingScreenData.value.lyricsData == null) {
+                                        Logger.w(tag, "Get lyrics from format")
+                                        getLyricsFromFormat(nowPlaying.mediaItem.isVideo(), song, (timeline.total / 1000).toInt())
+                                    }
+                                }
+                            }
+                        }
+                }
+            val checkGetVideoJob =
+                launch {
+                    dataStoreManager.watchVideoInsteadOfPlayingAudio.collectLatest {
+                        Logger.w(tag, "GetVideo is $it")
+                        _getVideo.value = it == TRUE
+                    }
+                }
+            val lyricsProviderJob =
+                launch {
+                    dataStoreManager.lyricsProvider.distinctUntilChanged().collectLatest {
+                        setLyricsProvider()
+                    }
+                }
+            val shareSavedLyricsJob =
+                launch {
+                    dataStoreManager.helpBuildLyricsDatabase.distinctUntilChanged().collectLatest {
+                        _shareSavedLyrics.value = it == TRUE
+                    }
+                }
+//            val controllerStateJob =
+//                launch {
+//                    controllerState.map { it.isLiked }.distinctUntilChanged().collectLatest {
+//                        if (dataStoreManager.combineLocalAndYouTubeLiked.first() == TRUE) {
+//                            nowPlayingState.value?.mediaItem?.mediaId?.let {
+//                                getLikeStatus(it)
+//                            }
+//                        }
+//                    }
+//                }
+            timeLineJob.join()
+            checkGetVideoJob.join()
+            lyricsProviderJob.join()
+            shareSavedLyricsJob.join()
+//            controllerStateJob.join()
+        }
+
+        runBlocking {
+            dataStoreManager.getString("miniplayer_guide").first().let {
+                isFirstMiniplayer = it != STATUS_DONE
+            }
+            dataStoreManager.getString("suggest_guide").first().let {
+                isFirstSuggestions = it != STATUS_DONE
+            }
+            dataStoreManager.getString("liked_guide").first().let {
+                isFirstLiked = it != STATUS_DONE
+            }
+        }
+        viewModelScope.launch {
+            mediaPlayerHandler.nowPlayingState
+                .distinctUntilChangedBy {
+                    it.songEntity?.videoId
+                }.collectLatest { state ->
+                    Logger.w(tag, "NowPlayingState is $state")
+                    canvasJob?.cancel()
+                    _nowPlayingState.value = state
+
+                    // Seed the timeline from METADATA as soon as the track is known, instead of
+                    // waiting for the player. SimpleMediaState.Ready carries a duration and only
+                    // fires once the container is parsed; after a queue restore nothing plays, the
+                    // position poll never starts (it runs only while isPlaying), and so nothing
+                    // ever reports a length — which is why a restored queue showed no times at all.
+                    // SongEntity has known the length since the song was first seen.
+                    //
+                    // Written on EVERY track change, not just when missing: leaving the old value
+                    // in place would show the previous track's length over the new one.
+                    // Order matters: metadata first because it is available immediately, then the
+                    // player's own duration, and only -1 ("not known yet") when neither has one.
+                    //
+                    // Writing -1 whenever metadata is missing — which this did at first — makes
+                    // every radio track and every first-time track flash NA:NA on the clock until
+                    // the container is parsed, because those rows have no durationSeconds stored.
+                    // Asking the player before giving up covers exactly that case: on a normal
+                    // track change it usually already knows.
+                    val metadataDurationMs = (state.songEntity?.durationSeconds ?: 0).toLong() * 1000L
+                    val seededTotal =
+                        metadataDurationMs.takeIf { it > 0L }
+                            ?: mediaPlayerHandler.getPlayerDuration().takeIf { it > 0L }
+                            ?: -1L
+                    _timeline.update { it.copy(total = seededTotal) }
+                    state.songEntity?.let { track ->
+                        _nowPlayingScreenData.value =
+                            NowPlayingScreenData(
+                                nowPlayingTitle = track.title,
+                                artistName =
+                                    track
+                                        .artistName
+                                        ?.joinToString(", ") ?: "",
+                                isVideo = false,
+                                thumbnailURL = null,
+                                canvasData = null,
+                                lyricsData = null,
+                                songInfoData = null,
+                                playlistName =
+                                    mediaPlayerHandler.queueData.value
+                                        ?.data
+                                        ?.playlistName ?: "",
+                            )
+                    }
+                    state.mediaItem.let { now ->
+                        _canvas.value = null
+                        getLikeStatus(now.mediaId)
+                        getSongInfo(now.mediaId)
+                        getFormat(now.mediaId)
+                        _nowPlayingScreenData.update {
+                            it.copy(
+                                thumbnailURL = now.metadata.artworkUri,
+                                isVideo = now.isVideo(),
+                            )
+                        }
+                    }
+                    state.songEntity?.let { song ->
+                        _liked.value = song.liked == true
+                        _nowPlayingScreenData.update {
+                            it.copy(
+                                isExplicit = song.isExplicit,
+                            )
+                        }
+                    }
+                }
+        }
+        viewModelScope.launch {
+            val job1 =
+                launch {
+                    mediaPlayerHandler.simpleMediaState.collect { mediaState ->
+                        when (mediaState) {
+                            is SimpleMediaState.Buffering -> {
+                                _timeline.update {
+                                    it.copy(
+                                        loading = true,
+                                    )
+                                }
+                            }
+
+                            SimpleMediaState.Initial -> {
+                                _timeline.update { it.copy(loading = true) }
+                            }
+
+                            SimpleMediaState.Ended -> {
+                                // Park at the end of the track rather than at -1. The only formatter
+                                // for these fields renders any negative as "NA:NA", and nothing here
+                                // is guaranteed to follow: at the end of the queue the player simply
+                                // stays ended, so a -1 written here stays on screen. Worse, the
+                                // Progress branch below ignores negative values and the Loading
+                                // branch restores `total` without touching `current`, which is how
+                                // the player ends up showing a correct duration next to "NA:NA".
+                                _timeline.update {
+                                    it.copy(
+                                        current = it.total.coerceAtLeast(0L),
+                                        bufferedPercent = 0,
+                                        loading = false,
+                                    )
+                                }
+                            }
+
+                            is SimpleMediaState.Progress -> {
+                                if (mediaState.progress >= 0L && mediaState.progress != _timeline.value.current) {
+                                    if (_timeline.value.total > 0L) {
+                                        _timeline.update {
+                                            it.copy(
+                                                total = mediaPlayerHandler.getPlayerDuration().takeIf { d -> d > 0L } ?: it.total,
+                                                current = mediaState.progress,
+                                                loading = false,
+                                            )
+                                        }
+                                    } else {
+                                        _timeline.update {
+                                            it.copy(
+                                                current = mediaState.progress,
+                                                loading = true,
+                                                total = mediaPlayerHandler.getPlayerDuration().takeIf { d -> d > 0L } ?: it.total,
+                                            )
+                                        }
+                                    }
+                                }
+                                // When progress hasn't changed (same value polled again) or is negative,
+                                // don't modify loading state. The loading flag is already managed by
+                                // Buffering/Ready/Loading state events. Setting loading=true here would
+                                // cause rapid flickering whenever the same value arrives twice,
+                                // which it can: the handler's ticker and the adapter's position
+                                // poll both run at 50ms and are not in step, so a poll is sometimes
+                                // read twice. A repeat is not evidence of a stall, and the loading
+                                // flag belongs to the Buffering/Ready events rather than to a
+                                // guess made here.
+                            }
+
+                            is SimpleMediaState.Loading -> {
+                                _timeline.update {
+                                    it.copy(
+                                        bufferedPercent = mediaState.bufferedPercentage,
+                                        total = mediaState.duration,
+                                        loading = true,
+                                    )
+                                }
+                            }
+
+                            is SimpleMediaState.Ready -> {
+                                _timeline.update {
+                                    it.copy(
+                                        current = mediaPlayerHandler.getProgress(),
+                                        loading = false,
+                                        // The player's own duration wins, but ONLY when it has one.
+                                        // ExoPlayer answers C.TIME_UNSET (a large negative, not
+                                        // null) until it has parsed the container, and Ready is
+                                        // also published from onIsLoadingChanged — which fires
+                                        // before STATE_READY. Writing that would throw away the
+                                        // metadata duration seeded on the track change above.
+                                        total = mediaState.duration.takeIf { d -> d > 0L } ?: it.total,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            val controllerJob =
+                launch {
+                    Logger.w(tag, "ControllerJob is running")
+                    mediaPlayerHandler.controlState.collectLatest {
+                        Logger.w(tag, "ControlState is $it")
+                        _controllerState.value = it
+                        // Propagate crossfade state to timeline so UI can react
+                        _timeline.update { timeline ->
+                            timeline.copy(isCrossfading = it.isCrossfading)
+                        }
+                    }
+                }
+            val sleepTimerJob =
+                launch {
+                    mediaPlayerHandler.sleepTimerState.collectLatest {
+                        _sleepTimerState.value = it
+                    }
+                }
+            val playlistNameJob =
+                launch {
+                    mediaPlayerHandler.queueData.collectLatest {
+                        _nowPlayingScreenData.update {
+                            it.copy(playlistName = it.playlistName)
+                        }
+                    }
+                }
+            job1.join()
+            controllerJob.join()
+            sleepTimerJob.join()
+            playlistNameJob.join()
+        }
+        // Reset downloading songs & playlists to not downloaded
+        checkAllDownloadingSongs()
+        checkAllDownloadingPlaylists()
+        checkAllDownloadingLocalPlaylists()
+    }
+
+
+    private val _showNotificationPermissionDialog = MutableStateFlow(false)
+    val showNotificationPermissionDialog: StateFlow<Boolean> = _showNotificationPermissionDialog
 
     fun dismissNotificationPermissionDialog(doNotShowAgain: Boolean) {
         _showNotificationPermissionDialog.value = false
