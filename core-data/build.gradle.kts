@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core-scraper"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("com.squareup.okio:okio:3.18.1")
     // Koin
     implementation(platform("io.insert-koin:koin-bom:4.2.2"))
