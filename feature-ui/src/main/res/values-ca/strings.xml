@@ -97,7 +97,7 @@
     <string name="about">Sobre</string>
     <string name="let_s_start_with_a_radio">COMENÇEM AMB UNA RÀDIO</string>
     <string name="let_s_pick_a_playlist_for_you">ESCOLLIM UNA LLISTA DE REPRODUCCIÓ PER A TU</string>
-    <string name="moods_amp_moment"><![CDATA[Estat d'ànim i moment]]></string>
+    <string name="moods_amp_moment"><![CDATA[Estat d\'ànim i moment]]></string>
     <string name="genre">Gènere</string>
     <string name="what_is_best_choice_today">QUÈ ÉS LA MILLOR ELECCIÓ AVUI</string>
     <string name="chart">Gràfic</string>
@@ -394,7 +394,7 @@
     <string name="auto_check_for_update">Busca actualitzacions automàticament</string>
     <string name="auto_check_for_update_description">Busca actualitzacions cada cop que l\'aplicació s\'obre</string>
     <string name="playback_speed_pitch"><![CDATA[Velocitat de reproducció i to]]></string>
-    <string name="playback_speed_pitch_disabled"><![CDATA[Velocitat de reproducció i to (desactivat quan l'encadenament està activat)]]></string>
+    <string name="playback_speed_pitch_disabled"><![CDATA[Velocitat de reproducció i to (desactivat quan l\'encadenament està activat)]]></string>
     <string name="playback_speed">Velocitat de reproducció</string>
     <string name="pitch">To</string>
     <string name="merging_audio_and_video">Fusionant àudio i vídeo</string>
