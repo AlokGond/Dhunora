@@ -541,9 +541,6 @@ class SharedViewModel(
     }
 
 
-    private val _showNotificationPermissionDialog = MutableStateFlow(false)
-    val showNotificationPermissionDialog: StateFlow<Boolean> = _showNotificationPermissionDialog
-
     fun dismissNotificationPermissionDialog(doNotShowAgain: Boolean) {
         _showNotificationPermissionDialog.value = false
         if (doNotShowAgain) {

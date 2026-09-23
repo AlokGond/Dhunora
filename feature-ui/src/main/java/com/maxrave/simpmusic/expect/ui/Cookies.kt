@@ -1,10 +1,20 @@
 package com.alok.dhunora.ui.expect.ui
 
+import android.view.ViewGroup
+import android.webkit.CookieManager
+import android.webkit.JsResult
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
 
 interface WebViewCookieManager {
     fun getCookie(url: String): String
@@ -13,6 +23,21 @@ interface WebViewCookieManager {
 }
 
 fun createWebViewCookieManager(): WebViewCookieManager =
+    object : WebViewCookieManager {
+        override fun getCookie(url: String): String {
+            val cookie = CookieManager.getInstance()
+            return if (cookie.hasCookies()) {
+                cookie.getCookie(url)
+            } else {
+                ""
+            }
+        }
+
+        override fun removeAllCookies() {
+            CookieManager.getInstance().removeAllCookies(null)
+            CookieManager.getInstance().flush()
+        }
+    }
 
 sealed class WebViewState {
     data class Loading(
@@ -117,3 +142,8 @@ fun DiscordWebView(
         aboveContent()
     }
 }
+const val JS_SNIPPET =
+    "javascript:(function()%7Bvar%20i%3Ddocument.createElement('iframe')%3Bdocument.body.appendChild(i)%3Balert(i.contentWindow.localStorage.token.slice(1,-1))%7D)()"
+private const val MOTOROLA = "motorola"
+private const val SAMSUNG_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14; SM-S921U; Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.363"

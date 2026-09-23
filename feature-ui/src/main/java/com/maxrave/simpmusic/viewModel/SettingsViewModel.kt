@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.koin.core.component.inject
+import org.koin.core.context.GlobalContext
 import com.alok.dhunora.ui.compat.getString as formatString
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -1996,12 +1997,12 @@ data class SettingBasicAlertState(
 
 
 fun getPackageName(): String {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     return application.packageName
 }
 
 fun getFileDir(): String {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     return application.filesDir.absolutePath
 }
 

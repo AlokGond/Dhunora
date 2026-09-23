@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import com.maxrave.logger.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.koin.mp.KoinPlatform.getKoin
+import org.koin.core.context.GlobalContext
 import java.io.File
 
 private const val TAG = "ImageIo"
@@ -24,7 +24,7 @@ suspend fun persistPickedImage(
 ): String? =
     withContext(Dispatchers.IO) {
         runCatching {
-            val context = getKoin().get<Context>()
+            val context = GlobalContext.get().get<Context>()
             val dir = File(context.filesDir, COVER_DIR).apply { mkdirs() }
             val file = File(dir, fileName)
             file.writeBytes(bytes)

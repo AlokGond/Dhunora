@@ -11,7 +11,7 @@ import androidx.core.content.FileProvider
 import com.maxrave.logger.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.koin.mp.KoinPlatform.getKoin
+import org.koin.core.context.GlobalContext
 import java.io.File
 
 private const val TAG = "ShareImage"
@@ -24,7 +24,7 @@ suspend fun saveImageToDevice(
 ): Boolean =
     withContext(Dispatchers.IO) {
         runCatching {
-            val context: AppCompatActivity = getKoin().get()
+            val context: AppCompatActivity = GlobalContext.get().get()
             val resolver = context.contentResolver
             val isScopedStorage = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
@@ -69,7 +69,7 @@ suspend fun shareImage(
 ): Boolean =
     withContext(Dispatchers.IO) {
         runCatching {
-            val context: AppCompatActivity = getKoin().get()
+            val context: AppCompatActivity = GlobalContext.get().get()
 
             // cacheDir, which provider_paths.xml already exposes as `cache`. The gallery copy is a
             // separate, explicit action — sharing must not silently write to the user's photos.

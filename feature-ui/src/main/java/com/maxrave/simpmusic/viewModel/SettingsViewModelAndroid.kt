@@ -31,7 +31,7 @@ import multiplatform.network.cmptoast.ToastGravity
 import multiplatform.network.cmptoast.showToast
 import com.alok.dhunora.ui.compat.getString
 import com.alok.dhunora.ui.R
-import org.koin.mp.KoinPlatform.getKoin
+import org.koin.core.context.GlobalContext
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.restore_success
 import java.io.File
@@ -43,7 +43,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 suspend fun calculateDataFraction(cacheRepository: CacheRepository): SettingsStorageSectionFraction? {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     return withContext(Dispatchers.Default) {
         val playerCache = cacheRepository.getCacheSize(Config.PLAYER_CACHE)
         val downloadCache = cacheRepository.getCacheSize(Config.DOWNLOAD_CACHE)
@@ -99,7 +99,7 @@ suspend fun restoreNative(
     uri: Uri,
     getData: () -> Unit,
 ) {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     application.applicationContext.contentResolver.openInputStream(uri.toAndroidUri())?.use {
         it.zipInputStream().use { inputStream ->
             var entry =
@@ -245,7 +245,7 @@ private fun restoreFolder(
     zipInputStream: ZipInputStream,
     baseFolderName: String,
 ) {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     Logger.d("BackupRestore", "Restoring entry: $entryName")
 
     // Extract relative path from entry name
@@ -284,7 +284,7 @@ suspend fun backupNative(
     uri: Uri,
     backupDownloaded: Boolean,
 ) {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     application.applicationContext.contentResolver.openOutputStream(uri.toAndroidUri())?.use {
         it.buffered().zipOutputStream().use { outputStream ->
             (application.filesDir / "datastore" / "$SETTINGS_FILENAME.preferences_pb")
@@ -320,12 +320,12 @@ suspend fun backupNative(
 }
 
 fun getPackageName(): String {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     return application.packageName
 }
 
 fun getFileDir(): String {
-    val application: Context = getKoin().get()
+    val application: Context = GlobalContext.get().get()
     return application.filesDir.absolutePath
 }
 
