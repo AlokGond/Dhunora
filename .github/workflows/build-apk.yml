@@ -37,7 +37,15 @@ jobs:
           echo "DHUNORA_KEY_PASSWORD=dhunora123" >> "$GITHUB_ENV"
 
       - name: Build release APK
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
 
       - name: Rename APK
         run: cp app/build/outputs/apk/release/app-release.apk Dhunora-v0.8.0-release.apk

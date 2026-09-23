@@ -29,7 +29,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import multiplatform.network.cmptoast.ToastGravity
 import multiplatform.network.cmptoast.showToast
-import org.jetbrains.compose.resources.getString
+import com.alok.dhunora.ui.compat.getString
+import com.alok.dhunora.ui.R
 import org.koin.mp.KoinPlatform.getKoin
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.restore_success
@@ -167,7 +168,7 @@ suspend fun restoreNative(
     debugFolderContents(downloadFolder)
 
     withContext(Dispatchers.Main) {
-        showToast(getString(Res.string.restore_success), ToastGravity.Bottom)
+        showToast(getString(R.string.restore_success), ToastGravity.Bottom)
 //                        mediaPlayerHandler.stopMediaService(application)
         stopService(application)
         getData()
