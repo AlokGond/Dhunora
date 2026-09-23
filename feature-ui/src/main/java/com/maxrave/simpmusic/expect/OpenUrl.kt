@@ -1,13 +1,12 @@
-package com.alok.dhunora.ui.fun openUrl(url: String) {
-    val context: AppCompatActivity = getKoin().get()
-    val browserIntent =
-        Intent(
-            Intent.ACTION_VIEW,
-            url.toUri(),
-        )
-    browserIntent.setFlags(FLAG_ACTIVITY_NEW_TASK)
-    context.startActivity(browserIntent)
-}
+package com.alok.dhunora.ui.expect
+
+import android.content.Intent
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
+import org.koin.mp.KoinPlatform.getKoin
+
+fun openUrl(url: String) {
     val context: AppCompatActivity = getKoin().get()
     val browserIntent =
         Intent(
