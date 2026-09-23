@@ -78,7 +78,7 @@ dependencies {
     implementation("com.mohamedrejeb.calf:calf-file-picker:0.13.0")
 
     // Toast
-    implementation("network.chaintech:cmptoast:1.0.8")
+    implementation("network.chaintech:cmptoast:1.0.71")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.2.1")

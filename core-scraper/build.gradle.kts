@@ -31,13 +31,14 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("com.squareup.okio:okio:3.18.1")
     // HTML parsing
-    implementation("com.mohamedrejeb:ksoup:0.6.0")
+    implementation("com.mohamedrejeb.ksoup:ksoup-html:0.6.0")
+    implementation("com.mohamedrejeb.ksoup:ksoup-entities:0.6.0")
     // QuickJS for cipher
     implementation("io.github.dokar3:quickjs-kt:1.0.14")
     // PipePipe extractor (YouTube)
     implementation("com.github.maxrave-dev:PipePipeExtractor:f8982ca9e7")
     // NewPipe extractor
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.1")
-    // XML
-    implementation("nl.adaptivity.xmlutil:xmlutil-core:0.90.0")
+    // XML (upstream resolves xmlutil transitively via ktor-xml)
+    implementation("io.ktor:ktor-serialization-kotlinx-xml:3.5.2")
 }
