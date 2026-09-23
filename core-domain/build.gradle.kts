@@ -23,7 +23,7 @@ dependencies {
     implementation(project(":core-common"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:2.4.10")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.eygraber:uri-kmp:0.0.21")
     // Room annotations for entities (compiler runs in core-data)
     implementation("androidx.room:room-runtime:2.8.4")

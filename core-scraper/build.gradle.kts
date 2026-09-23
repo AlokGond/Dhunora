@@ -26,7 +26,7 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp:3.5.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:2.4.10")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.7.0")
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("com.squareup.okio:okio:3.18.1")
