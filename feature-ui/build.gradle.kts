@@ -74,9 +74,8 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.44.0")
 
     // File picker (CALF)
-    implementation("com.mohamedrejeb.calf:calf-core:0.13.0")
-    implementation("com.mohamedrejeb.calf:calf-io:0.13.0")
-    implementation("com.mohamedrejeb.calf:calf-picker:0.13.0")
+    implementation("com.mohamedrejeb.calf:calf-ui:0.13.0")
+    implementation("com.mohamedrejeb.calf:calf-file-picker:0.13.0")
 
     // Toast
     implementation("multiplatform.network.cmptoast:cmptoast:1.0.71")
