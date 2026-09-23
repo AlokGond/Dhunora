@@ -1,5 +1,6 @@
 plugins {
     id("com.android.library")
+    id("androidx.room")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
