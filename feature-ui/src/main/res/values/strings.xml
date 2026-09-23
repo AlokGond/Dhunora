@@ -101,8 +101,8 @@
     <string name="singles">Singles</string>
     <string name="related_artists">Related Artists</string>
     <string name="about">About</string>
-    <string name="let_s_start_with_a_radio">LET'S START WITH A RADIO</string>
-    <string name="let_s_pick_a_playlist_for_you">LET'S PICK A PLAYLIST FOR YOU</string>
+    <string name="let_s_start_with_a_radio">LET\'S START WITH A RADIO</string>
+    <string name="let_s_pick_a_playlist_for_you">LET\'S PICK A PLAYLIST FOR YOU</string>
     <string name="moods_amp_moment"><![CDATA[Moods & Moment]]></string>
     <string name="genre">Genre</string>
     <string name="what_is_best_choice_today">WHAT IS BEST CHOICE TODAY</string>
@@ -132,7 +132,7 @@
     <string name="developer_blog">Developer Blog</string>
     <string name="developer_blog_tagline">Read dev notes, tutorials &amp; behind-the-scenes</string>
     <string name="blog_promo_title">Something new from the dev</string>
-    <string name="blog_promo_message">I just launched my personal blog at maxrave.dev — sharing the story behind SimpMusic, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
+    <string name="blog_promo_message">I just launched my personal blog at maxrave.dev — sharing the story behind SimpMusic, music-tech deep dives, and engineering notes. Give it a read if you\'re curious ✨</string>
     <string name="visit_blog">Visit blog</string>
     <string name="paypal">PayPal</string>
     <string name="title">Title</string>
@@ -169,7 +169,7 @@
     <string name="balance_media_loudness">Balance media loudness</string>
     <string name="normalize_volume">Normalize Volume</string>
     <string name="audio">Audio</string>
-    <string name="no_equalizer">Your device doesn't have equalizer</string>
+    <string name="no_equalizer">Your device doesn\'t have equalizer</string>
     <string name="open_system_equalizer">Open system equalizer</string>
     <string name="use_your_system_equalizer">Use your system equalizer</string>
     <string name="version_format" translatable="false">v%1$s</string>
@@ -218,7 +218,7 @@
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">An unexpected error occurred. Sorry for the inconvenience.</string>
     <string name="customactivityoncrash_error_activity_restart_app">Restart app</string>
     <string name="help_build_lyrics_database">Help SimpMusic lyrics build the lyrics database</string>
-    <string name="help_build_lyrics_database_description">Send your saved lyrics to SimpMusic lyrics's database</string>
+    <string name="help_build_lyrics_database_description">Send your saved lyrics to SimpMusic lyrics\'s database</string>
     <string name="customactivityoncrash_error_activity_close_app">Close app</string>
     <string name="customactivityoncrash_error_activity_error_details">Error details</string>
     <string name="customactivityoncrash_error_activity_error_details_title">Error details</string>
@@ -272,7 +272,7 @@
     <string name="email">Email</string>
     <string name="password">Password</string>
     <string name="please_enter_your_email_and_password">Please enter your email and password</string>
-    <string name="translation_language_message">Type language code (Eg: en) (2 letters). If you want to set same with SimpMusic's language, please make edit box empty.</string>
+    <string name="translation_language_message">Type language code (Eg: en) (2 letters). If you want to set same with SimpMusic\'s language, please make edit box empty.</string>
     <string name="invalid_language_code">Invalid language code</string>
     <string name="lyrics_provider_youtube">Lyrics provided by YouTube</string>
     <string name="lyrics_provider_betterlyrics">Lyrics provided by BetterLyrics</string>
@@ -332,9 +332,9 @@
     <string name="equalizer_autoeq_choose">Choose headphone</string>
     <string name="equalizer_autoeq_search">Headphone model</string>
     <string name="equalizer_autoeq_downloading">Downloading the AutoEq profile list…</string>
-    <string name="equalizer_autoeq_unavailable">Couldn't reach AutoEq. Check your connection and try again.</string>
+    <string name="equalizer_autoeq_unavailable">Couldn\'t reach AutoEq. Check your connection and try again.</string>
     <string name="equalizer_autoeq_empty">No headphone matches that name</string>
-    <string name="equalizer_autoeq_failed">Couldn't load that profile — it needs a connection the first time</string>
+    <string name="equalizer_autoeq_failed">Couldn\'t load that profile — it needs a connection the first time</string>
     <string name="audio_delay">Delay</string>
     <string name="audio_delay_description">Echo the sound with a repeating delay</string>
     <string name="audio_reverb">Reverb</string>
@@ -363,7 +363,7 @@
     <string name="reverb_help_damping_meaning">Damping is where the tail starts losing treble. It darkens further as it decays, the way air and soft surfaces absorb highs.</string>
     <string name="reverb_help_mix">Mix is the wet share: the slider sets how much of the room you hear against the dry signal, identically on Android and Desktop.</string>
     <string name="sync_follow_to_youtube_description">Following an artist in SimpMusic also subscribes to their channel on your YouTube account</string>
-    <string name="sync_follow_failed">Couldn't update your YouTube subscription</string>
+    <string name="sync_follow_failed">Couldn\'t update your YouTube subscription</string>
     <string name="subscribed_on_youtube">Subscribed on YouTube</string>
     <string name="unsubscribed_on_youtube">Unsubscribed on YouTube</string>
     <string name="no_account">No account</string>
@@ -385,7 +385,7 @@
     <string name="enable_canvas">Enable Canvas</string>
     <string name="canvas_info">Show Spotify Canvas in SimpMusic</string>
     <string name="enable_animated_artwork">Animated artwork</string>
-    <string name="animated_artwork_info">Play the album's animated cover instead of a Canvas. No account needed. Albums without one keep the still cover.</string>
+    <string name="animated_artwork_info">Play the album\'s animated cover instead of a Canvas. No account needed. Albums without one keep the still cover.</string>
     <string name="spotify_lyrics_provider">Lyrics provided by Spotify</string>
     <string name="offline_mode">Offline mode</string>
     <string name="added_to_youtube_liked">Added to YouTube Liked</string>
@@ -447,7 +447,7 @@
     <string name="romanization_macedonian" translatable="false">Macedonian</string>
     <string name="romanization_japanese_dict_downloading">Downloading the Japanese dictionary…</string>
     <string name="romanization_japanese_dict_ready">Japanese dictionary downloaded</string>
-    <string name="romanization_japanese_dict_failed">Couldn't download the Japanese dictionary. Check your connection and select Japanese again to retry.</string>
+    <string name="romanization_japanese_dict_failed">Couldn\'t download the Japanese dictionary. Check your connection and select Japanese again to retry.</string>
     <string name="theme_color">Theme color</string>
     <string name="theme_color_default">Default</string>
     <string name="theme_color_wallpaper">Wallpaper</string>
@@ -466,12 +466,12 @@
     <string name="focus">Focus</string>
     <string name="updated">Updated</string>
     <string name="updated_to_youtube_playlist">Updated to YouTube Playlist</string>
-    <string name="can_t_add_to_youtube_playlist">Can't add to YouTube Playlist</string>
-    <string name="can_t_delete_from_youtube_playlist">Can't delete song from YouTube Playlist</string>
+    <string name="can_t_add_to_youtube_playlist">Can\'t add to YouTube Playlist</string>
+    <string name="can_t_delete_from_youtube_playlist">Can\'t delete song from YouTube Playlist</string>
     <string name="loading">Loading</string>
     <string name="updating">Updating</string>
     <string name="go_to_log_in_page">Go to log in page</string>
-    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can't work too. You should log in to YouTube to get better experience with SimpMusic.</string>
+    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can\'t work too. You should log in to YouTube to get better experience with SimpMusic.</string>
     <string name="spotify_canvas_cache">Spotify Canvas Cache</string>
     <string name="clear_canvas_cache">Clear canvas cache</string>
     <string name="listening_history">Listening history</string>
@@ -526,7 +526,7 @@
     <string name="if_you_love_my_work_consider">"If you love my work, consider "</string>
     <string name="buying_me_a_coffee">buying me a coffee.</string>
     <string name="footguns_promo_title">Every trap I fell into</string>
-    <string name="footguns_promo_message">SimpMusic cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don't lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
+    <string name="footguns_promo_message">SimpMusic cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don\'t lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
     <string name="fade_audio_effect">Fade audio effect</string>
     <string name="disabled">Disable</string>
     <string name="fade_audio_effect_duration">Fade audio effect duration (ms) (Set to 0 for disable)</string>
@@ -590,7 +590,7 @@
     <string name="backup_in_progress">Backup in progress</string>
     <string name="restore_in_progress">Restore in progress</string>
     <string name="backup_downloaded">Backup downloaded data</string>
-    <string name="backup_downloaded_description">Backup all downloaded songs's data</string>
+    <string name="backup_downloaded_description">Backup all downloaded songs\'s data</string>
     <string name="auto_backup">Auto backup</string>
     <string name="auto_backup_description">Automatically backup your data to Downloads/SimpMusic folder</string>
     <string name="backup_frequency">Backup frequency</string>
@@ -608,7 +608,7 @@
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="update_channel">Update channel</string>
     <string name="enable_liquid_glass_effect">Enable liquid glass (BETA)</string>
-    <string name="enable_liquid_glass_effect_description">Enable iOS's liquid glass effect in some position (Android 13+)</string>
+    <string name="enable_liquid_glass_effect_description">Enable iOS\'s liquid glass effect in some position (Android 13+)</string>
     <string name="your_library">Your library</string>
     <string name="play_explicit_content">Play explicit content</string>
     <string name="play_explicit_content_description">Enable to play explicit content</string>
@@ -724,7 +724,7 @@
     <string name="bpm">BPM</string>
     <string name="key">Key</string>
     <string name="scale">Scale</string>
-    <string name="home_offline_title">Can't connect</string>
+    <string name="home_offline_title">Can\'t connect</string>
     <string name="home_offline_subtitle">Check your internet connection and try again, or listen to your downloaded music.</string>
     <string name="listen_to_downloaded">Listen to downloaded music</string>
     <string name="playing_on_device">Playing on %1$s</string>
@@ -891,8 +891,8 @@
     <string name="login_sync_expired">This code has expired.</string>
     <string name="login_sync_new_code">New code</string>
     <string name="login_sync_no_network">No network address found on this computer.</string>
-    <string name="login_sync_start_failed">Couldn't start: %1$s</string>
-    <string name="login_sync_receive_failed">Couldn't receive the sign-ins: %1$s</string>
+    <string name="login_sync_start_failed">Couldn\'t start: %1$s</string>
+    <string name="login_sync_receive_failed">Couldn\'t receive the sign-ins: %1$s</string>
     <string name="login_sync_scan_hint">Point the camera at the QR code on your computer</string>
     <string name="login_sync_connecting">Connecting to your computer…</string>
     <string name="login_sync_trust_title">Trust this computer?</string>
@@ -902,13 +902,13 @@
     <string name="login_sync_send">Send</string>
     <string name="login_sync_sending">Sending…</string>
     <string name="login_sync_sent">Signed in on %1$s: %2$s</string>
-    <string name="login_sync_nothing_signed_in">You're not signed in to any service yet.</string>
+    <string name="login_sync_nothing_signed_in">You\'re not signed in to any service yet.</string>
     <string name="login_sync_camera_needed">SimpMusic uses the camera only to scan the code shown on your computer.</string>
     <string name="login_sync_allow_camera">Allow camera</string>
     <string name="login_sync_camera_blocked">Camera access is turned off for SimpMusic. Turn it on in Settings to scan the code.</string>
     <string name="login_sync_open_settings">Open settings</string>
     <string name="login_sync_no_camera">No camera is available to scan the code.</string>
-    <string name="login_sync_unreachable">Couldn't reach the computer. Make sure your phone is on the same network or tailnet, then try again.</string>
+    <string name="login_sync_unreachable">Couldn\'t reach the computer. Make sure your phone is on the same network or tailnet, then try again.</string>
     <string name="login_sync_code_expired">The code on your computer has expired. Show a new one and scan again.</string>
     <string name="login_sync_failed">Something went wrong. Please try again.</string>
     <string name="modified_build_title">Unofficial app</string>
