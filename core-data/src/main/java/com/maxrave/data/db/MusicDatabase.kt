@@ -6,8 +6,9 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.sqlite.execSQL
+import androidx.room.execSQL as roomExecSQL
 import androidx.room.useWriterConnection
+import androidx.sqlite.execSQL as sqliteExecSQL
 import androidx.sqlite.SQLiteConnection
 import com.maxrave.common.DB_NAME
 import org.koin.core.context.GlobalContext
@@ -52,6 +53,23 @@ import com.maxrave.domain.data.entities.analytics.PlaybackEventEntity
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun getDatabaseDao(): DatabaseDao
 
+    /**
+     * Rewrite the database file so the pages a bulk delete freed go back to the filesystem.
+     *
+     * It lives here rather than on the DAO because the DAO has no way to ask for a **writer**
+     * connection. `DatabaseDao.raw()` is the only door out to arbitrary SQL, and Room cannot parse
+     * what a `@RawQuery` will do, so it generates `performSuspending(__db, isReadOnly = true, ...)`
+     * for it — while a parsed `@Query` that deletes gets `isReadOnly = false`. Reader connections
+     * are opened with `PRAGMA query_only = 1`, under which VACUUM fails outright with "attempt to
+     * write a readonly database". `PRAGMA wal_checkpoint` is accepted on that very same connection,
+     * which is why the sibling `DatabaseDao.checkpoint()` works and hid this for so long.
+     *
+     * [roomExecSQL] prepares and steps the statement without opening a transaction, which is required:
+     * SQLite refuses VACUUM inside one. Do not wrap this call in [androidx.room.Transactor.withTransaction].
+     */
+    suspend fun vacuum() {
+        useWriterConnection { it.roomExecSQL("VACUUM") }
+    }
 }
 
 fun getDatabaseBuilder(converters: Converters) : RoomDatabase.Builder<MusicDatabase> {
@@ -62,7 +80,7 @@ fun getDatabaseBuilder(converters: Converters) : RoomDatabase.Builder<MusicDatab
             object : RoomDatabase.Callback() {
                 override fun onOpen(connection: SQLiteConnection) {
                     super.onOpen(connection)
-                    connection.execSQL(
+                    connection.sqliteExecSQL(
                         "CREATE TRIGGER  IF NOT EXISTS on_delete_pair_song_local_playlist AFTER DELETE ON pair_song_local_playlist\n" +
                             "FOR EACH ROW\n" +
                             "BEGIN\n" +
