@@ -67,7 +67,7 @@ abstract class MusicDatabase : RoomDatabase() {
      * SQLite refuses VACUUM inside one. Do not wrap this call in [androidx.room.Transactor.withTransaction].
      */
     suspend fun vacuum() {
-        useWriterConnection { it.execSQL("VACUUM") }
+        useWriterConnection { it.executeSQL("VACUUM") }
     }
 }
 

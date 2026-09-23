@@ -60,8 +60,6 @@ import com.maxrave.domain.repository.SearchRepository
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.repository.StreamRepository
 import com.maxrave.logger.Logger
-import com.maxrave.media3.cast.CastHandoffManager
-import com.maxrave.media3.cast.CastStreamResolver
 import com.maxrave.media3.exoplayer.CrossfadeExoPlayerAdapter
 import com.maxrave.media3.extension.isFullyCached
 import com.maxrave.media3.repository.CacheRepositoryImpl
@@ -85,8 +83,6 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.loadKoinModules
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import org.simpmusic.cast.initCast
-import org.simpmusic.cast.wrapWithCastPlayer
 import java.net.Proxy
 import kotlin.time.Duration.Companion.seconds
 
@@ -171,13 +167,10 @@ private val mediaServiceModule =
         }
 
         // Player exposed for MediaSession + UI (video rendering via PlayerView/PlayerSurface).
-        // The adapter's ForwardingPlayer (delegating to the active ExoPlayer) is wrapped with
-        // Cast support in the full build; org.simpmusic.cast no-ops back to the same instance
-        // in the FOSS build, so this stays the stable session-level player either way.
+        // FOSS build: no Cast module, so the adapter's ForwardingPlayer is used directly.
         single<Player>(qualifier = named(MAIN_PLAYER)) {
             val adapter = get<MediaPlayerInterface>() as CrossfadeExoPlayerAdapter
-            initCast(androidContext())
-            wrapWithCastPlayer(androidContext(), adapter.forwardingPlayer)
+            adapter.forwardingPlayer
         }
 
         // CoilBitmapLoader
@@ -194,17 +187,6 @@ private val mediaServiceModule =
                 audioAttributes = get(),
                 streamRepository = get(),
             )
-        }
-
-        // Local ↔ Cast receiver handoff. No-op when wrapWithCastPlayer returned the plain
-        // ForwardingPlayer (FOSS build or no GMS on the device).
-        single<CastHandoffManager>(createdAtStart = true) {
-            CastHandoffManager(
-                adapter = get<MediaPlayerInterface>() as CrossfadeExoPlayerAdapter,
-                sessionPlayer = get(qualifier = named(MAIN_PLAYER)),
-                resolver = CastStreamResolver(get(), get()),
-                coroutineScope = get(qualifier = named(SERVICE_SCOPE)),
-            ).also { it.start() }
         }
 
         // MediaSession Callback for main player

@@ -2,7 +2,12 @@
 
 package com.alok.dhunora.ui.expect.ui
 
+import android.content.Context
+import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import org.koin.mp.KoinPlatform.getKoin
+import java.io.File
 
 /**
  * Decodes encoded image bytes — whatever the picker handed back — into something Compose can draw.
@@ -11,6 +16,7 @@ import androidx.compose.ui.graphics.ImageBitmap
  * format the platform decoder does not know, or truncated.
  */
 fun decodeImageBitmap(bytes: ByteArray): ImageBitmap? =
+    runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
 
 /**
  * Writes [bytes] into the app's own storage and returns a `file:` uri for it.
@@ -19,7 +25,14 @@ fun decodeImageBitmap(bytes: ByteArray): ImageBitmap? =
  * uncropped file, and on Android the read permission granted for it does not survive a restart.
  * Returns null when the write fails, so the caller can keep the previous cover instead.
  */
-expect suspend fun persistPickedImage(
+suspend fun persistPickedImage(
     bytes: ByteArray,
     fileName: String,
-): String?
+): String? =
+    runCatching {
+        val context: Context = getKoin().get()
+        val dir = File(context.filesDir, "covers").apply { mkdirs() }
+        val file = File(dir, fileName)
+        file.writeBytes(bytes)
+        "file://${file.absolutePath}"
+    }.getOrNull()
