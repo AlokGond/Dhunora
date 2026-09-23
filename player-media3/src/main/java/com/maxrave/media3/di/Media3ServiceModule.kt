@@ -85,6 +85,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.net.Proxy
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 /**
  * Required repository first initialization
@@ -467,8 +468,8 @@ private fun provideCacheDataSource(
                             OkHttpDataSource.Factory(
                                 OkHttpClient
                                     .Builder()
-                                    .connectTimeout(30.seconds)
-                                    .readTimeout(30.seconds)
+                                    .connectTimeout(30.seconds.toJavaDuration())
+                                    .readTimeout(30.seconds.toJavaDuration())
                                     .proxy(
                                         proxy,
                                     ).addInterceptor(
