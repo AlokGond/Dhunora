@@ -67,6 +67,10 @@ dependencies {
 
     // Blur
     implementation("dev.chrisbanes.haze:haze:1.7.2")
+    implementation("dev.chrisbanes.haze:haze-materials:1.7.2")
+
+    // Date/time
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
 
     // AboutLibraries
     implementation("com.mikepenz:aboutlibraries-core:15.0.2")
@@ -100,5 +104,6 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.10.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3-adaptive")
     implementation("androidx.compose.material:material-icons-extended")
 }
