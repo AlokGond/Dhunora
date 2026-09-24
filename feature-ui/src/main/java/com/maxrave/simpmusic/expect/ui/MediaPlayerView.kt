@@ -28,7 +28,7 @@ fun MediaPlayerViewWithSubtitle(
     playerName: String,
     shouldPip: Boolean,
     shouldShowSubtitle: Boolean,
-    shouldScaleDownSubtitle: Boolean,
+    shouldScaleDownSubtitle: Boolean = false,
     isInPipMode: Boolean,
     timelineState: TimeLine,
     lyricsData: Lyrics?,
