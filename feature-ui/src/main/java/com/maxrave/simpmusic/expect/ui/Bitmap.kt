@@ -1,13 +1,16 @@
 package com.alok.dhunora.ui.expect.ui
 
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import coil3.Image
+import java.io.ByteArrayOutputStream
 
 fun ImageBitmap.toByteArray(): ByteArray? {
     val byteArrayOutputStream = ByteArrayOutputStream()
-    this.asAndroidBitmap().compress(JPEG, 100, byteArrayOutputStream)
-    val bytesArray = byteArrayOutputStream.toByteArray()
-    return bytesArray
+    this.asAndroidBitmap().compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+    return byteArrayOutputStream.toByteArray()
 }
 
 /**
@@ -18,11 +21,10 @@ fun ImageBitmap.toByteArray(): ByteArray? {
  * the artefacts are plainly visible. PNG also keeps the card's rounded corners transparent
  * instead of filling them black.
  */
-fun ImageBitmap.toByteArray(): ByteArray? {
+fun ImageBitmap.toPngByteArray(): ByteArray? {
     val byteArrayOutputStream = ByteArrayOutputStream()
-    this.asAndroidBitmap().compress(JPEG, 100, byteArrayOutputStream)
-    val bytesArray = byteArrayOutputStream.toByteArray()
-    return bytesArray
+    this.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+    return byteArrayOutputStream.toByteArray()
 }
 
-fun Image.toImageBitmap(): ImageBitmap = this.toBitmap().asImageBitmap()
+fun Image.toImageBitmap(): ImageBitmap = (this as coil3.BitmapImage).bitmap.asImageBitmap()

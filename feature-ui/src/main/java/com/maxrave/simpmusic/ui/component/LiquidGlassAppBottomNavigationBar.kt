@@ -23,7 +23,7 @@ import kotlin.reflect.KClass
 
 @Composable
 fun LiquidGlassAppBottomNavigationBar(
-    startDestination: Any,
+    startDestination: Any? = null,
     navController: NavController,
     backdrop: PlatformBackdrop,
     viewModel: SharedViewModel,
