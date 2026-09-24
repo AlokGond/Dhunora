@@ -32,6 +32,9 @@
                 <data android:scheme="https" android:host="simpmusic.org"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".CrashReportActivity"
+            android:exported="false" />
         <service
             android:name="com.maxrave.media3.service.SimpleMediaService"
             android:exported="false"
