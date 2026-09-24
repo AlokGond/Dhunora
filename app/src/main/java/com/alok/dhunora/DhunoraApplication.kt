@@ -1,7 +1,12 @@
 package com.alok.dhunora
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.database.CursorWindow
+import android.util.Log
+import java.io.PrintWriter
+import java.io.StringWriter
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -23,6 +28,29 @@ import org.koin.core.logger.Level
 import java.util.concurrent.TimeUnit
 
 class DhunoraApplication : Application(), SingletonImageLoader.Factory {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        // Diagnostic: capture any launch crash and show it on screen so the
+        // user can copy/paste the stack trace back to the developer.
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            try {
+                val sw = StringWriter()
+                e.printStackTrace(PrintWriter(sw))
+                val trace = sw.toString()
+                Log.e("DhunoraCrash", trace)
+                try {
+                    val dir = getExternalFilesDir(null)
+                    if (dir != null) java.io.File(dir, "dhunora-crash.txt").writeText(trace)
+                } catch (_: Exception) {}
+                val intent = Intent(this, CrashReportActivity::class.java).apply {
+                    putExtra(CrashReportActivity.EXTRA_TRACE, trace)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
+                startActivity(intent)
+            } catch (_: Exception) {}
+        }
+    }
 
     @OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
