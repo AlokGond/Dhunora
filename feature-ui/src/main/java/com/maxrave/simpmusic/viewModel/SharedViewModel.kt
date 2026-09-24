@@ -1411,6 +1411,8 @@ class SharedViewModel(
                 getSimpMusicTranslatedLyrics(
                     videoId,
                     data,
+                    song,
+                    duration,
                 )
             } else if (dataStoreManager.spotifyLyrics.first() == TRUE) {
                 getSpotifyLyrics(
@@ -1611,6 +1613,11 @@ class SharedViewModel(
 
                 else -> {
                     Logger.w(tag, "Get SimpMusic Translated Lyrics Error: ${response.message}")
+                    getLrclibLyrics(
+                        song,
+                        artistName,
+                        duration,
+                    )
                 }
             }
         }
