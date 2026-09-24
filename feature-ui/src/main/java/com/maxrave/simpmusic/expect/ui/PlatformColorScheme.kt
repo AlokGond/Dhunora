@@ -1,4 +1,11 @@
 package com.alok.dhunora.ui.expect.ui
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import com.alok.dhunora.ui.extension.getActivityOrNull
 
 import android.os.Build
 import androidx.compose.material3.ColorScheme

@@ -12,14 +12,7 @@ fun MediaPlayerView(
     modifier: Modifier,
     cropToBounds: Boolean,
 ) {
-    MediaPlayerView(
-        modifier = modifier,
-        context = LocalContext.current,
-        density = LocalDensity.current,
-        url = url,
-        screenSize = getScreenSizeInfo(),
-        cropToBounds = cropToBounds,
-    )
+    // TODO: Implement video playback view
 }
 
 @Composable
@@ -36,19 +29,5 @@ fun MediaPlayerViewWithSubtitle(
     mainTextStyle: TextStyle,
     translatedTextStyle: TextStyle,
 ) {
-    MediaPlayerViewWithSubtitle(
-        playerName = playerName,
-        modifier = modifier,
-        shouldShowSubtitle = shouldShowSubtitle,
-        shouldPip = shouldPip,
-        shouldScaleDownSubtitle = shouldScaleDownSubtitle,
-        timelineState = timelineState,
-        lyricsData = lyricsData,
-        translatedLyricsData = translatedLyricsData,
-        context = LocalContext.current,
-        activity = LocalActivity.current as? ComponentActivity ?: LocalContext.current.findActivity(),
-        isInPipMode = isInPipMode,
-        mainTextStyle = typo().bodyLarge,
-        translatedTextStyle = typo().bodyMedium,
-    )
+    // TODO: Implement video playback with subtitles
 }

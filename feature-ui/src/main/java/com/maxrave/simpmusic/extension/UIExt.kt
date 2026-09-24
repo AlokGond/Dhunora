@@ -53,7 +53,17 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.Point
 import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.app.PictureInPictureModeChangedInfo
+import androidx.core.util.Consumer
+import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -745,4 +755,22 @@ fun hsvToColor(
         blue = (b + m).coerceIn(0f, 1f),
         alpha = 1f,
     )
+}
+fun Context.getActivityOrNull(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+
+    return null
+}
+
+fun Context.findActivity(): ComponentActivity {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is ComponentActivity) return context
+        context = context.baseContext
+    }
+    throw IllegalStateException("Picture in picture should be called in the context of an Activity")
 }

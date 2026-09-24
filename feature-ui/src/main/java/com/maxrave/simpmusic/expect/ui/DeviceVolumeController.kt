@@ -1,4 +1,5 @@
 package com.alok.dhunora.ui.expect.ui
+import kotlin.math.roundToInt
 
 import android.content.Context
 import android.media.AudioManager
@@ -10,6 +11,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+
+private const val POLL_INTERVAL_MS = 500L
+
+private fun AudioManager.currentVolumeFraction(): Float {
+    val max = getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    if (max == 0) return 0f
+    return getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
+}
 
 /**
  * Handle onto the OS-level media volume (Android's `STREAM_MUSIC`). Distinct from the app's own

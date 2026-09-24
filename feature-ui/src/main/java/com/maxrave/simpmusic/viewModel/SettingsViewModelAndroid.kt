@@ -32,8 +32,6 @@ import multiplatform.network.cmptoast.showToast
 import com.alok.dhunora.ui.compat.getString
 import com.alok.dhunora.ui.R
 import org.koin.core.context.GlobalContext
-import simpmusic.composeapp.generated.resources.Res
-import simpmusic.composeapp.generated.resources.restore_success
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream

@@ -1,4 +1,15 @@
 package com.alok.dhunora.ui.ui.screen.player
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.view.WindowManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.alok.dhunora.ui.extension.findActivity
 
 import androidx.compose.animation.Crossfade
 import com.alok.dhunora.ui.R

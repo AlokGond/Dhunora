@@ -1,22 +1,19 @@
 package com.alok.dhunora.ui.utils
 
-import com.alok.dhunora.ui.BuildKonfig
+import android.content.Context
+import org.koin.core.context.GlobalContext
 
 object VersionManager {
-    private var versionName: String? = null
+    fun getVersionName(): String = removeDevSuffix(readVersionName())
 
-    fun initialize() {
-        if (versionName == null) {
-            versionName =
-                try {
-                    BuildKonfig.versionName
-                } catch (_: Exception) {
-                    String()
-                }
+    private fun readVersionName(): String =
+        try {
+            val context: Context = GlobalContext.get().get()
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+        } catch (_: Exception) {
+            ""
         }
-    }
-
-    fun getVersionName(): String = removeDevSuffix(versionName ?: String())
 
     private fun removeDevSuffix(versionName: String): String {
         return if (versionName.endsWith("-dev")) {

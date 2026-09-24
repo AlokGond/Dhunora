@@ -1996,27 +1996,6 @@ data class SettingBasicAlertState(
 
 
 
-fun getPackageName(): String {
-    val application: Context = GlobalContext.get().get()
-    return application.packageName
-}
-
-fun getFileDir(): String {
-    val application: Context = GlobalContext.get().get()
-    return application.filesDir.absolutePath
-}
-
-fun changeLanguageNative(code: String) {
-    try {
-        val localeList =
-            LocaleListCompat.forLanguageTags(code)
-        Logger.d("Language", localeList.toString())
-        AppCompatDelegate.setApplicationLocales(localeList)
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
 /** Number of equalizer bands, matching the ISO centres the desktop backend installs. */
 const val EQUALIZER_BAND_COUNT = 10
 
