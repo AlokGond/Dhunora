@@ -43,7 +43,7 @@ android {
         }
     }
     packaging {
-        resources.excludes += setOf("META-INF/DEPENDENCIES","META-INF/NOTICE","META-INF/LICENSE","META-INF/LICENSE.txt","META-INF/NOTICE.txt")
+        resources.excludes += setOf("META-INF/DEPENDENCIES","META-INF/NOTICE","META-INF/LICENSE","META-INF/LICENSE.txt","META-INF/NOTICE.txt","META-INF/CONTRIBUTORS.md")
     }
 }
 
