@@ -55,6 +55,8 @@ dependencies {
     implementation(project(":core-domain"))
     implementation("network.chaintech:cmptoast:1.0.71")
     implementation("androidx.media3:media3-common:1.11.1")
+    implementation("com.eygraber:uri-kmp:0.0.21")
+    implementation("com.squareup.okio:okio:3.9.0")
 
     val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)
