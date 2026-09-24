@@ -11,8 +11,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import com.alok.dhunora.ui.App
 import com.alok.dhunora.ui.viewModel.SharedViewModel
 import com.maxrave.domain.manager.DataStoreManager
-import com.maxrave.domain.manager.MediaPlayerHandler
-import com.maxrave.domain.model.ToastType
+import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
+import com.maxrave.domain.mediaservice.handler.ToastType
 import com.maxrave.logger.Logger
 import com.maxrave.media3.di.setServiceActivitySession
 import com.maxrave.media3.di.startService
@@ -123,8 +123,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun startMusicService() {
         startService(this@MainActivity, serviceConnection)
-        mediaPlayerHandler.pushPlayerError = { it ->
-            pushPlayerError(it)
+        mediaPlayerHandler.pushPlayerError = { error ->
+            Logger.e("MainActivity", "Player error: $error")
         }
         mediaPlayerHandler.showToast = { type ->
             viewModel.makeToast(
