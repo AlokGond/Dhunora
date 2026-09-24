@@ -53,8 +53,8 @@ dependencies {
     implementation(project(":core-data"))
     implementation(project(":core-common"))
     implementation(project(":core-domain"))
-    implementation("network.multiplatform:cmptoast:1.0.8")
-    implementation("androidx.media3:media3-common:1.7.1")
+    implementation("network.chaintech:cmptoast:1.0.71")
+    implementation("androidx.media3:media3-common:1.11.1")
 
     val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)
