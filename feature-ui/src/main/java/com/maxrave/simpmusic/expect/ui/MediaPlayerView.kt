@@ -10,7 +10,7 @@ import com.maxrave.domain.data.model.streams.TimeLine
 fun MediaPlayerView(
     url: String,
     modifier: Modifier,
-    cropToBounds: Boolean,
+    cropToBounds: Boolean = true,
 ) {
     // TODO: Implement video playback view
 }

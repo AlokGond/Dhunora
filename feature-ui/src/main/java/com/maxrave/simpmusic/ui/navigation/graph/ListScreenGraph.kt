@@ -13,14 +13,12 @@ import com.alok.dhunora.ui.ui.navigation.destination.list.BrowseDestination
 import com.alok.dhunora.ui.ui.navigation.destination.list.LocalPlaylistDestination
 import com.alok.dhunora.ui.ui.navigation.destination.list.MoreAlbumsDestination
 import com.alok.dhunora.ui.ui.navigation.destination.list.PlaylistDestination
-import com.alok.dhunora.ui.ui.navigation.destination.list.PodcastDestination
 import com.alok.dhunora.ui.ui.screen.library.LocalPlaylistScreen
 import com.alok.dhunora.ui.ui.screen.other.AlbumScreen
 import com.alok.dhunora.ui.ui.screen.other.ArtistScreen
 import com.alok.dhunora.ui.ui.screen.other.BrowseScreen
 import com.alok.dhunora.ui.ui.screen.other.MoreAlbumsScreen
 import com.alok.dhunora.ui.ui.screen.other.PlaylistScreen
-import com.alok.dhunora.ui.ui.screen.other.PodcastScreen
 import com.alok.dhunora.ui.ui.theme.ForceDarkContent
 
 @ExperimentalMaterial3Api
@@ -81,15 +79,6 @@ fun NavGraphBuilder.listScreenGraph(
             PlaylistScreen(
                 playlistId = data.playlistId,
                 isYourYouTubePlaylist = data.isYourYouTubePlaylist,
-                navController = navController,
-            )
-        }
-    }
-    composable<PodcastDestination> { entry ->
-        val data = entry.toRoute<PodcastDestination>()
-        ForceDarkContent {
-            PodcastScreen(
-                podcastId = data.podcastId,
                 navController = navController,
             )
         }

@@ -43,6 +43,6 @@ fun formatNumericSpan(
     start: LocalDate,
     end: LocalDate,
 ): String {
-    val from = if (start.year == end.year) "${start.day}/${start.month.number}" else "${start.day}/${start.month.number}/${start.year}"
-    return "$from-${end.day}/${end.month.number}/${end.year}"
+    val from = if (start.year == end.year) "${start.day}/${start.month.ordinal + 1}" else "${start.day}/${start.month.ordinal + 1}/${start.year}"
+    return "$from-${end.day}/${end.month.ordinal + 1}/${end.year}"
 }
