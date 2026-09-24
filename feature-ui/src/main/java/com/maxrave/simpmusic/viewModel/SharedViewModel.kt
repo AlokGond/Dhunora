@@ -1564,17 +1564,20 @@ class SharedViewModel(
     private suspend fun getSimpMusicTranslatedLyrics(
         videoId: String,
         lyrics: Lyrics,
+        song: SongEntity,
+        duration: Int,
     ) {
         val translationLanguage =
             dataStoreManager.translationLanguage.first()
+        val artistName = song.artistName?.firstOrNull() ?: ""
         lyricsCanvasRepository.getSimpMusicTranslatedLyrics(videoId, translationLanguage).collectLatest { response ->
             val data = response.data
             when (response) {
                 is Resource.Success if (data != null) -> {
                     // If SimpMusic translated lyrics are RICH_SYNCED (word-by-word),
-                    // convert to LINE_SYNCED, downvote, and fallback to AI translation
+                    // convert to LINE_SYNCED, downvote, and fallback to LRCLib
                     if (data.syncType == "RICH_SYNCED") {
-                        Logger.w(tag, "SimpMusic translated lyrics are RICH_SYNCED, downvoting and falling back to AI")
+                        Logger.w(tag, "SimpMusic translated lyrics are RICH_SYNCED, downvoting and falling back to LRCLib")
                         val simpMusicLyricsId = data.simpMusicLyrics?.id
                         if (!simpMusicLyricsId.isNullOrEmpty()) {
                             viewModelScope.launch {
@@ -1588,6 +1591,12 @@ class SharedViewModel(
                                     }
                             }
                         }
+                        // Fallback to LRCLib
+                        getLrclibLyrics(
+                            song,
+                            artistName,
+                            duration,
+                        )
                     } else {
                         Logger.d(tag, "Get SimpMusic Translated Lyrics Success")
                         updateLyrics(
@@ -1607,26 +1616,6 @@ class SharedViewModel(
         }
     }
 
-                            else -> {
-                                Logger.w(tag, "Get AI Translate Lyrics Error: ${it.message}")
-                            }
-                        }
-                    }
-            }
-        }
-    }
-
-                    else -> {
-                        getLrclibLyrics(
-                            track.toSongEntity(),
-                            track.artists.toListName().firstOrNull() ?: "",
-                            duration ?: 0,
-                        )
-                    }
-                }
-            }
-        }
-    }
 
     private fun getSpotifyLyrics(
         track: Track,
