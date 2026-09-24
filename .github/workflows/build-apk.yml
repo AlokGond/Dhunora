@@ -2,11 +2,23 @@ name: Build Dhunora APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_only:
+        description: "Skip build; only attach an existing build artifact APK to a release"
+        type: boolean
+        default: false
+      run_id:
+        description: "Build run id whose artifact holds the APK (publish_only)"
+        default: "35946049590"
+      tag:
+        description: "Release tag to attach the APK to (publish_only)"
+        default: "v0.8.0-simpmusic"
   push:
-    branches: [ main ]
+    branches: [ main, simpmusic-port ]
 
 jobs:
   build:
+    if: ${{ !inputs.publish_only }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +49,15 @@ jobs:
           echo "DHUNORA_KEY_PASSWORD=dhunora123" >> "$GITHUB_ENV"
 
       - name: Build release APK
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
 
       - name: Rename APK
         run: cp app/build/outputs/apk/release/app-release.apk Dhunora-v0.8.0-release.apk
@@ -48,3 +68,25 @@ jobs:
           name: Dhunora-v0.8.0-release
           path: Dhunora-v0.8.0-release.apk
           if-no-files-found: error
+
+  publish:
+    if: ${{ inputs.publish_only }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download APK artifact from build run
+        uses: actions/download-artifact@v4
+        with:
+          name: Dhunora-v0.8.0-release
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: apk
+
+      - name: Attach APK to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la apk/
+          gh release upload "${{ inputs.tag }}" apk/Dhunora-v0.8.0-release.apk --clobber --repo AlokGond/Dhunora

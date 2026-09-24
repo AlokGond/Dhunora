@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.alok.dhunora"
-        minSdk = 23
+        minSdk = 26
         targetSdk = 36
         versionCode = 19
         versionName = "0.19.0"
@@ -19,6 +19,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
+    }
+    kotlin {
+        jvmToolchain(17)
     }
     buildFeatures { compose = true }
 
@@ -40,28 +43,50 @@ android {
         }
     }
     packaging {
-        resources.excludes += setOf("META-INF/DEPENDENCIES","META-INF/NOTICE","META-INF/LICENSE","META-INF/LICENSE.txt","META-INF/NOTICE.txt")
+        resources.excludes += setOf("META-INF/DEPENDENCIES","META-INF/NOTICE","META-INF/LICENSE","META-INF/LICENSE.txt","META-INF/NOTICE.txt","META-INF/CONTRIBUTORS.md","META-INF/LICENSE.md","META-INF/NOTICE.md")
     }
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    implementation(project(":feature-ui"))
+    implementation(project(":player-media3"))
+    implementation(project(":core-data"))
+    implementation(project(":core-common"))
+    implementation(project(":core-domain"))
+    implementation("network.chaintech:cmptoast:1.0.71")
+    implementation("androidx.media3:media3-common:1.11.1")
+    implementation("com.eygraber:uri-kmp:0.0.21")
+    implementation("com.squareup.okio:okio:3.9.0")
+
+    val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)
-    implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.12.2")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.compose.material3:material3:1.5.0-alpha26")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+    // Koin
+    implementation(platform("io.insert-koin:koin-bom:4.2.2"))
+    implementation("io.insert-koin:koin-core")
+    implementation("io.insert-koin:koin-android")
+
+    // Coil 3
+    implementation("io.coil-kt.coil3:coil:3.5.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
-    implementation("androidx.media3:media3-exoplayer:1.11.1")
-    implementation("androidx.media3:media3-session:1.11.1")
+
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.10.2")
-    implementation("androidx.core:core-ktx:1.17.0")
-    implementation("androidx.palette:palette-ktx:1.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
+
+// Exclude duplicate protobuf to avoid DuplicateClass error
+configurations.all {
+    exclude(group = "com.google.protobuf", module = "protobuf-javalite")
 }

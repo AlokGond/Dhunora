@@ -7,3 +7,11 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Dhunora"
 include(":app")
+include(":core-common")
+include(":core-domain")
+include(":core-ktorext")
+include(":core-scraper")
+include(":core-lyrics")
+include(":core-data")
+include(":player-media3")
+include(":feature-ui")

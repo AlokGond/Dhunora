@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     <application
         android:name=".DhunoraApplication"
+        tools:replace="android:name"
         android:allowBackup="true"
         android:label="Dhunora"
         android:icon="@drawable/ic_dhunora_launcher"
@@ -13,26 +17,40 @@
         android:theme="@style/Theme.Dhunora"
         android:usesCleartextTraffic="false">
         <activity
-            android:name=".account.LoginActivity"
-            android:exported="false"/>
-        <activity
-            android:name=".account.SpotifyLoginActivity"
-            android:exported="false"/>
-        <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="simpmusic"/>
+                <data android:scheme="https" android:host="simpmusic.org"/>
+            </intent-filter>
         </activity>
+        <activity
+            android:name=".CrashReportActivity"
+            android:exported="false" />
         <service
-            android:name=".player.PlaybackService"
+            android:name="com.maxrave.media3.service.SimpleMediaService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
         </service>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.alok.dhunora.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
