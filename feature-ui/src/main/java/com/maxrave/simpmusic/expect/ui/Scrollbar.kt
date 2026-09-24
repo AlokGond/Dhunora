@@ -19,7 +19,7 @@ fun HorizontalScrollBar(
 @Composable
 fun HorizontalScrollBar(
     modifier: Modifier,
-    scrollState: LazyListState,
+    scrollState: LazyGridState,
     flingBehavior: FlingBehavior?,
 ) {
 }

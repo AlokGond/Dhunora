@@ -1,4 +1,4 @@
-package com.maxrave.simpmusic.ui.component
+package com.alok.dhunora.ui.ui.component
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
